@@ -9,7 +9,7 @@
     :enableSpring="setting.showYrcAnimation"
     :enableScale="setting.showYrcAnimation" 
     :enableBlur="setting.lyricsBlur"
-    :enableInterludeDots="true"
+        :enableInterludeDots="true"
     :wordFadeWidth="0.5" 
     :linePosXSpringParams="setting.springParams.posX"
     :linePosYSpringParams="setting.springParams.posY" 
@@ -50,13 +50,14 @@ const alignPosition = computed(() =>
 
 // 计算歌词样式
 const lyricStyles = computed(() => ({
-  '--amll-lyric-view-color': setting.immersivePlayer ? site.songPicColor : 'rgb(239, 239, 239)',
+  '--amll-lp-color': mainColor.value,
   '--amll-lyric-player-font-size': `${setting.lyricsFontSize * 10}px`,
-  '--amll-lyric-player-line-height': setting.lyricLineHeight,
+  '--amll-lp-height': setting.lyricLineHeight,
   'font-weight': setting.lyricFontWeight,
   'font-family': setting.lyricFont,
   'letter-spacing': setting.lyricLetterSpacing,
   'cursor': 'pointer',
+  '--amll-lyric-view-color': mainColor.value,
   'user-select': 'none',
   '-webkit-tap-highlight-color': 'transparent'
 }));
@@ -71,14 +72,21 @@ const handleLineClick = (e: { line: { getLine: () => { startTime: number } } }) 
   }
 };
 
+const mainColor = computed(() => {
+  if (!setting.immersivePlayer) return "rgb(239, 239, 239)";
+  return `rgb(${site.songPicColor})`;
+});
+
 // 获取当前歌词
 const currentLyrics = computed<LyricLine[]>(() => {
   const songLyric = music.songLyric || { lrcAMData: [], yrcAMData: [] };
-  return createLyricsProcessor(songLyric, {
+  const lyricData = createLyricsProcessor(songLyric, { 
     showYrc: setting.showYrc,
     showRoma: setting.showRoma,
     showTransl: setting.showTransl
   });
+  console.log("lyricData:", lyricData);
+  return lyricData;
 });
 
 watch(() => music.playState, (newState) => {
