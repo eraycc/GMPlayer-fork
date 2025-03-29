@@ -9,7 +9,7 @@
     :enableSpring="setting.showYrcAnimation"
     :enableScale="setting.showYrcAnimation" 
     :enableBlur="setting.lyricsBlur"
-        :enableInterludeDots="true"
+    :enableInterludeDots="true"
     :wordFadeWidth="0.5" 
     :linePosXSpringParams="setting.springParams.posX"
     :linePosYSpringParams="setting.springParams.posY" 
@@ -31,6 +31,7 @@ const music = musicStore();
 const setting = settingStore();
 
 const emit = defineEmits<{
+  'line-click': [e: { line: { getLine: () => { startTime: number } } }],
   lrcTextClick: [time: number]
 }>();
 
@@ -66,7 +67,8 @@ const lyricStyles = computed(() => ({
 const handleLineClick = (e: { line: { getLine: () => { startTime: number } } }) => {
   const time = e.line.getLine().startTime;
   if (time != null) {
-    emit("lrcTextClick", time);
+    emit("lrcTextClick", time / 1000);
+    emit("line-click", e); // 同时发送原始事件，保持兼容性
   }
 };
 
@@ -83,12 +85,10 @@ const currentLyrics = computed<LyricLine[]>(() => {
     showRoma: setting.showRoma,
     showTransl: setting.showTransl
   });
-  console.log("lyricData:", lyricData);
   return lyricData;
 });
 
 watch(() => music.playState, (newState) => {
-  console.log("music.playState:", newState);
   if (newState) {
     lyricPlayerRef.value?.lyricPlayer?.value?.setCurrentTime(currentTime.value);
   }
