@@ -434,6 +434,9 @@ const volumeMute = () => {
       width: 100%;
       height: 100%;
       background-color: #00000060;
+    }
+
+    &:not(.eplor) {
       backdrop-filter: blur(20px);
     }
 

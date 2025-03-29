@@ -51,7 +51,7 @@ const alignPosition = computed(() =>
 // 计算歌词样式
 const lyricStyles = computed(() => ({
   '--amll-lp-color': mainColor.value,
-  '--amll-lyric-player-font-size': `${setting.lyricsFontSize * 10}px`,
+  '--amll-lyric-player-font-size': `${setting.lyricsFontSize * 11}px`,
   '--amll-lp-height': setting.lyricLineHeight,
   'font-weight': setting.lyricFontWeight,
   'font-family': setting.lyricFont,
@@ -66,9 +66,7 @@ const lyricStyles = computed(() => ({
 const handleLineClick = (e: { line: { getLine: () => { startTime: number } } }) => {
   const time = e.line.getLine().startTime;
   if (time != null) {
-    console.log("click time:", time);
     emit("lrcTextClick", time);
-    music.playState = true;
   }
 };
 
