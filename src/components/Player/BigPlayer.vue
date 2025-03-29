@@ -90,10 +90,17 @@
                 <div :class="menuShow ? 'menu show' : 'menu'" v-show="setting.playerStyle === 'record'">
                   <div class="time">
                     <span>{{ music.getPlaySongTime.songTimePlayed }}</span>
-                    <vue-slider v-model="music.getPlaySongTime.barMoveDistance" @drag-start="music.setPlayState(false)"
-                      @drag-end="sliderDragEnd" @click.stop="
-                        songTimeSliderUpdate(music.getPlaySongTime.barMoveDistance)
-                        " :tooltip="'none'" />
+                    <n-slider v-model:value="music.getPlaySongTime.barMoveDistance" 
+                      @update:value="(val) => songTimeSliderUpdate(val)"
+                      @start="music.setPlayState(false)"
+                      @stop="sliderDragEnd"
+                      :tooltip="false"
+                      :step="0.0001"
+                      class="slider">
+                      <template #thumb>
+                        <div class="custom-thumb"></div>
+                      </template>
+                    </n-slider>
                     <span>{{ music.getPlaySongTime.songTimeDuration }}</span>
                   </div>
                   <div class="control">
@@ -140,6 +147,7 @@ import {
   SkipPreviousRound,
   ThumbDownRound,
 } from "@vicons/material";
+import { NIcon, NSlider, NButton } from "naive-ui";
 import { musicStore, settingStore, siteStore } from "@/store";
 import { useRouter } from "vue-router";
 import { setSeek } from "@/utils/Player";
@@ -149,8 +157,6 @@ import RollingLyrics from "./RollingLyrics.vue";
 import Spectrum from "./Spectrum.vue";
 import LyricSetting from "@/components/DataModal/LyricSetting.vue";
 import screenfull from "screenfull";
-import VueSlider from "vue-slider-component";
-import "vue-slider-component/theme/default.css";
 import BackgroundRender from "@/libs/apple-music-like/BackgroundRender.vue";
 import { throttle } from "throttle-debounce"
 import { analyzeAudioIntensity } from "../../utils/fftIntensityAnalyze";
@@ -178,7 +184,7 @@ const lrcTextClick = (time) => {
     // 防止soundStop被调用
     music.persistData.playSongTime.currentTime = time;
     $player.seek(time);
-    music.setPlayState(true);
+  music.setPlayState(true);
   }
   lrcMouseStatus.value = false;
 };
@@ -636,60 +642,58 @@ watch(
             width: 100%;
             margin-right: 3em;
             margin-left: 3em;
+            padding-bottom: 0.2em;
 
             span {
               opacity: 0.8;
+              font-size: 0.9em;
+              min-width: 35px;
             }
 
-            .vue-slider {
+            .slider {
               margin: 0 10px;
               width: 100% !important;
-              transform: translateY(-1px);
               cursor: pointer;
 
-
-              :deep(.vue-slider-rail) {
+              :deep(.n-slider-rail) {
                 background-color: #ffffff20;
                 border-radius: 25px;
+                height: 6px;
+              }
 
-                .vue-slider-process {
-                  background-color: var(--main-cover-color) !important;
-                }
+              :deep(.n-slider-rail__fill) {
+                background-color: var(--main-cover-color);
+                border-radius: 25px;
+              }
+              
+              .custom-thumb {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background-color: var(--main-cover-color);
+                box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+                border: 2px solid rgba(255, 255, 255, 0.9);
+                transition: transform 0.2s;
+              }
 
-                .vue-slider-dot {
-                  width: 12px !important;
-                  height: 12px !important;
-                  box-shadow: none;
-                }
-
-                .vue-slider-dot-handle-focus {
-                  box-shadow: none;
-                }
-
-                .vue-slider-dot-tooltip-inner {
-                  background-color: var(--main-cover-color) !important;
-                  backdrop-filter: blur(2px);
-                  border: none
-                }
-
-                .vue-slider-dot-handle {
-                  background-color: var(--main-cover-color) !important
-                }
-
-                .vue-slider-dot-tooltip-text {
-                  color: black;
+              :deep(.n-slider-handle) {
+                box-shadow: none;
+                background-color: transparent;
+                
+                &:hover .custom-thumb {
+                  transform: scale(1.1);
                 }
               }
             }
           }
 
           .control {
-            margin-top: 0.8em;
+            margin-top: 0.7em;
             display: flex;
             flex-direction: row;
             align-items: center;
             justify-content: center;
-            transform: scale(1.4);
+            transform: scale(1.3);
 
             .next,
             .prev,
@@ -698,9 +702,11 @@ watch(
               padding: 4px;
               border-radius: 50%;
               transition: all 0.3s;
+              opacity: 0.8;
 
               &:hover {
                 background-color: var(--main-color);
+                opacity: 1;
               }
 
               &:active {
@@ -727,7 +733,7 @@ watch(
               }
 
               &:active {
-                transform: scale(1);
+                transform: scale(0.98);
               }
             }
           }

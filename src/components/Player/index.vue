@@ -4,21 +4,26 @@
       @click.stop="setting.bottomClick ? music.setBigPlayerState(true) : null">
       <div class="slider">
         <span>{{ music.getPlaySongTime.songTimePlayed }}</span>
-        <vue-slider v-model="music.getPlaySongTime.barMoveDistance" @drag-start="music.setPlayState(false)"
-          @drag-end="sliderDragEnd" @click.stop="
-            songTimeSliderUpdate(music.getPlaySongTime.barMoveDistance)
-            " :tooltip="'active'" :use-keyboard="false">
-          <template v-slot:tooltip>
+        <n-slider v-model:value="music.getPlaySongTime.barMoveDistance"
+          @start="music.setPlayState(false)"
+          @stop="sliderDragEnd"
+          @update:value="(val) => songTimeSliderUpdate(val)"
+          :tooltip="true"
+          :step="0.0001"
+          class="progress-slider">
+          <template #tooltip="{ value }">
             <div class="slider-tooltip">
               {{
                 getSongPlayingTime(
-                  (music.getPlaySongTime.duration / 100) *
-                  music.getPlaySongTime.barMoveDistance
+                  (music.getPlaySongTime.duration / 100) * value
                 )
               }}
             </div>
           </template>
-        </vue-slider>
+          <template #thumb>
+            <div class="custom-thumb"></div>
+          </template>
+        </n-slider>
         <span>{{ music.getPlaySongTime.songTimeDuration }}</span>
       </div>
       <div class="all">
@@ -163,7 +168,11 @@
               }}
             </n-popover>
             <n-slider class="volmePg" v-model:value="persistData.playVolume" :tooltip="false" :min="0" :max="1"
-              :step="0.01" @click.stop />
+              :step="0.01" @click.stop>
+              <template #thumb>
+                <div class="custom-thumb"></div>
+              </template>
+            </n-slider>
           </div>
         </div>
       </div>
@@ -214,12 +223,11 @@ import { getSongPlayingTime } from "@/utils/timeTools";
 import { useRouter } from "vue-router";
 import { debounce } from "throttle-debounce";
 import { useI18n } from "vue-i18n";
-import VueSlider from "vue-slider-component";
+import { NSlider } from "naive-ui";
 import AddPlaylist from "@/components/DataModal/AddPlaylist.vue";
 import PlayListDrawer from "@/components/DataModal/PlayListDrawer.vue";
 import AllArtists from "@/components/DataList/AllArtists.vue";
 import BigPlayer from "./BigPlayer.vue";
-import "vue-slider-component/theme/default.css";
 import { watch } from "vue";
 
 const { t } = useI18n();
@@ -457,20 +465,19 @@ watch(
     left: 0;
     width: 100%;
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: space-between;
+    padding: 0 30px;
 
     @media (max-width: 640px) {
       top: -8px;
 
-      > {
         span {
           display: none;
-        }
       }
     }
 
-    > {
       span {
         font-size: 12px;
         white-space: nowrap;
@@ -479,40 +486,50 @@ watch(
         padding: 2px 8px;
         border-radius: 25px;
         margin: 0 2px;
+    }
+
+    .progress-slider {
+      flex: 1;
+      margin: 0 10px;
+      cursor: pointer;
+
+      :deep(.n-slider-rail) {
+        background-color: var(--n-border-color);
+        border-radius: 25px;
+        height: 4px;
+      }
+
+      :deep(.n-slider-rail__fill) {
+        background-color: var(--main-color);
+        border-radius: 25px;
+      }
+
+      .custom-thumb {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: var(--main-color);
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+        border: 2px solid #fff;
+        transition: transform 0.2s;
+      }
+
+      :deep(.n-slider-handle) {
+        box-shadow: none;
+        background-color: transparent;
+        
+        &:hover .custom-thumb {
+          transform: scale(1.1);
+        }
       }
     }
 
-    .vue-slider {
-      width: 100% !important;
-      height: 3px !important;
-      cursor: pointer;
-
-      .slider-tooltip {
-        font-size: 12px;
-        white-space: nowrap;
-        background-color: var(--n-color);
-        outline: 1px solid var(--n-border-color);
-        padding: 2px 8px;
-        border-radius: 25px;
-      }
-
-      :deep(.vue-slider-rail) {
-        background-color: var(--n-border-color);
-        border-radius: 25px;
-
-        .vue-slider-process {
-          background-color: var(--main-color);
-        }
-
-        .vue-slider-dot {
-          width: 12px !important;
-          height: 12px !important;
-        }
-
-        .vue-slider-dot-handle-focus {
-          box-shadow: 0px 0px 1px 2px var(--main-color);
-        }
-      }
+    .slider-tooltip {
+      font-size: 12px;
+      padding: 2px 8px;
+      background-color: var(--main-color);
+      border-radius: 8px;
+      color: white;
     }
   }
 
@@ -741,6 +758,25 @@ watch(
         .volmePg {
           --n-handle-size: 12px;
           --n-rail-height: 3px;
+          
+          .custom-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--main-color);
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+            border: 2px solid #fff;
+            transition: transform 0.2s;
+          }
+
+          :deep(.n-slider-handle) {
+            box-shadow: none;
+            background-color: transparent;
+            
+            &:hover .custom-thumb {
+              transform: scale(1.1);
+            }
+          }
         }
       }
     }

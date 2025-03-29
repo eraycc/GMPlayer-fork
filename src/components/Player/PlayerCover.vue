@@ -54,10 +54,17 @@
       </div>
       <div class="time">
         <span>{{ music.getPlaySongTime.songTimePlayed }}</span>
-        <vue-slider v-model="music.getPlaySongTime.barMoveDistance" @drag-start="music.setPlayState(false)"
-          @drag-end="sliderDragEnd" @click.stop="
-            songTimeSliderUpdate(music.getPlaySongTime.barMoveDistance)
-            " :tooltip="'none'" />
+        <n-slider v-model:value="music.getPlaySongTime.barMoveDistance" 
+          @start="music.setPlayState(false)"
+          @stop="sliderDragEnd"
+          @update:value="(val) => songTimeSliderUpdate(val)"
+          :tooltip="false"
+          :step="0.0001"
+          class="time-slider">
+          <template #thumb>
+            <div class="custom-thumb"></div>
+          </template>
+        </n-slider>
         <span>{{ music.getPlaySongTime.songTimeDuration }}</span>
       </div>
       <div class="buttons">
@@ -109,7 +116,16 @@
               : $t("general.name.unmute")
           }}
         </n-popover>
-        <vue-slider :tooltip="'none'" :min="0" :max="1" :interval="0.001" v-model="persistData.playVolume" />
+        <n-slider v-model:value="persistData.playVolume"
+          :tooltip="false" 
+          :min="0" 
+          :max="1" 
+          :step="0.001"
+          class="volume-slider">
+          <template #thumb>
+            <div class="custom-thumb"></div>
+          </template>
+        </n-slider>
         <span>100%</span>
       </div>
     </div>
@@ -137,8 +153,7 @@ import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
 import { setSeek } from "@/utils/Player";
 import AllArtists from "@/components/DataList/AllArtists.vue";
-import VueSlider from "vue-slider-component";
-import "vue-slider-component/theme/default.css";
+import { NSlider } from "naive-ui";
 
 const router = useRouter();
 const music = musicStore();
@@ -332,43 +347,39 @@ const volumeMute = () => {
         opacity: 0.8;
       }
 
-      .vue-slider {
+      .time-slider,
+      .volume-slider {
         margin: 0 10px;
         width: 100% !important;
-        transform: translateY(-1px);
         cursor: pointer;
 
-        :deep(.vue-slider-rail) {
+        :deep(.n-slider-rail) {
           background-color: #ffffff20;
           border-radius: 25px;
+          height: 4px;
+        }
 
-          .vue-slider-process {
-            background-color: var(--main-cover-color);
-          }
+        :deep(.n-slider-rail__fill) {
+          background-color: var(--main-cover-color);
+          border-radius: 25px;
+        }
 
-          .vue-slider-dot {
-            width: 12px !important;
-            height: 12px !important;
-            box-shadow: none;
-          }
+        .custom-thumb {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background-color: var(--main-cover-color);
+          box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+          border: 2px solid rgba(255, 255, 255, 0.9);
+          transition: transform 0.2s;
+        }
 
-          .vue-slider-dot-handle-focus {
-            box-shadow: none;
-          }
-
-          .vue-slider-dot-tooltip-inner {
-            background-color: var(--main-cover-color);
-            backdrop-filter: blur(2px);
-            border: none
-          }
-
-          .vue-slider-dot-tooltip-text {
-            color: var(--main-cover-color);
-          }
-
-          .vue-slider-dot-handle {
-            background-color: var(--main-cover-color);
-            backdrop-filter: blur(2px);
+        :deep(.n-slider-handle) {
+          box-shadow: none;
+          background-color: transparent;
+          
+          &:hover .custom-thumb {
+            transform: scale(1.1);
           }
         }
       }
