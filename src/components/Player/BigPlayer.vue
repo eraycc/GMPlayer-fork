@@ -90,17 +90,13 @@
                 <div :class="menuShow ? 'menu show' : 'menu'" v-show="setting.playerStyle === 'record'">
                   <div class="time">
                     <span>{{ music.getPlaySongTime.songTimePlayed }}</span>
-                    <n-slider v-model:value="music.getPlaySongTime.barMoveDistance" 
-                      @update:value="(val) => songTimeSliderUpdate(val)"
-                      @start="music.setPlayState(false)"
-                      @stop="sliderDragEnd"
-                      :tooltip="false"
-                      :step="0.0001"
-                      class="slider">
-                      <template #thumb>
-                        <div class="custom-thumb"></div>
-                      </template>
-                    </n-slider>
+                    <player-slider
+                      v-model:value="music.getPlaySongTime.barMoveDistance"
+                      :duration="music.getPlaySongTime.duration"
+                      :show-tooltip="false"
+                      slider-class="large-player-progress"
+                      :is-progress="true"
+                    />
                     <span>{{ music.getPlaySongTime.songTimeDuration }}</span>
                   </div>
                   <div class="control">
@@ -158,9 +154,10 @@ import Spectrum from "./Spectrum.vue";
 import LyricSetting from "@/components/DataModal/LyricSetting.vue";
 import screenfull from "screenfull";
 import BackgroundRender from "@/libs/apple-music-like/BackgroundRender.vue";
-import { throttle } from "throttle-debounce"
+import { throttle, debounce } from "throttle-debounce"
 import { analyzeAudioIntensity } from "../../utils/fftIntensityAnalyze";
 import { storeToRefs } from "pinia";
+import PlayerSlider from "./PlayerSlider.vue";
 
 const router = useRouter();
 const music = musicStore();
@@ -187,18 +184,6 @@ const lrcTextClick = (time) => {
   music.setPlayState(true);
   }
   lrcMouseStatus.value = false;
-};
-
-// 歌曲进度条更新
-const sliderDragEnd = () => {
-  songTimeSliderUpdate(music.getPlaySongTime.barMoveDistance);
-  music.setPlayState(true);
-};
-const songTimeSliderUpdate = (val) => {
-  if (typeof $player !== "undefined" && music.getPlaySongTime?.duration) {
-    const currentTime = (music.getPlaySongTime.duration / 100) * val;
-    setSeek($player, currentTime);
-  }
 };
 
 // 鼠标移出歌词区域
@@ -666,24 +651,19 @@ watch(
                 border-radius: 25px;
               }
               
-              .custom-thumb {
+              :deep(.n-slider-handle) {
                 width: 12px;
                 height: 12px;
-                border-radius: 50%;
                 background-color: var(--main-cover-color);
                 box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
                 border: 2px solid rgba(255, 255, 255, 0.9);
-                transition: transform 0.2s;
               }
-
-              :deep(.n-slider-handle) {
-                box-shadow: none;
-                background-color: transparent;
-                
-                &:hover .custom-thumb {
-                  transform: scale(1.1);
-                }
-              }
+            }
+            
+            .big-player-thumb {
+              background-color: var(--main-cover-color);
+              box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+              border: 2px solid rgba(255, 255, 255, 0.9);
             }
           }
 

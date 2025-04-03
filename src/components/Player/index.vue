@@ -4,26 +4,14 @@
       @click.stop="setting.bottomClick ? music.setBigPlayerState(true) : null">
       <div class="slider">
         <span>{{ music.getPlaySongTime.songTimePlayed }}</span>
-        <n-slider v-model:value="music.getPlaySongTime.barMoveDistance"
-          @start="music.setPlayState(false)"
-          @stop="sliderDragEnd"
-          @update:value="(val) => songTimeSliderUpdate(val)"
-          :tooltip="true"
-          :step="0.0001"
-          class="progress-slider">
-          <template #tooltip="{ value }">
-            <div class="slider-tooltip">
-              {{
-                getSongPlayingTime(
-                  (music.getPlaySongTime.duration / 100) * value
-                )
-              }}
-            </div>
-          </template>
-          <template #thumb>
-            <div class="custom-thumb"></div>
-          </template>
-        </n-slider>
+        <player-slider
+          v-model:value="music.getPlaySongTime.barMoveDistance"
+          :duration="music.getPlaySongTime.duration"
+          :show-tooltip="true"
+          :tooltip-content="music.getPlaySongTime.songTimePlayed"
+          slider-class="progress-slider"
+          :is-progress="true"
+        />
         <span>{{ music.getPlaySongTime.songTimeDuration }}</span>
       </div>
       <div class="all">
@@ -167,12 +155,16 @@
                   : $t("general.name.unmute")
               }}
             </n-popover>
-            <n-slider class="volmePg" v-model:value="persistData.playVolume" :tooltip="false" :min="0" :max="1"
-              :step="0.01" @click.stop>
-              <template #thumb>
-                <div class="custom-thumb"></div>
-              </template>
-            </n-slider>
+            <player-slider
+              v-model:value="persistData.playVolume" 
+              :show-tooltip="false" 
+              :min="0"
+              :max="1"
+              :step="0.01"
+              slider-class="volmePg"
+              :is-progress="false"
+              @click.stop
+            />
           </div>
         </div>
       </div>
@@ -221,13 +213,14 @@ import {
 } from "@/utils/Player";
 import { getSongPlayingTime } from "@/utils/timeTools";
 import { useRouter } from "vue-router";
-import { debounce } from "throttle-debounce";
+import { debounce, throttle } from "throttle-debounce";
 import { useI18n } from "vue-i18n";
 import { NSlider } from "naive-ui";
 import AddPlaylist from "@/components/DataModal/AddPlaylist.vue";
 import PlayListDrawer from "@/components/DataModal/PlayListDrawer.vue";
 import AllArtists from "@/components/DataList/AllArtists.vue";
 import BigPlayer from "./BigPlayer.vue";
+import PlayerSlider from "./PlayerSlider.vue";
 import { watch } from "vue";
 
 const { t } = useI18n();
@@ -329,18 +322,6 @@ const getMusicNumUrlData = (id) => {
       $message.warning(t("general.message.playError"));
       music.setPlaySongIndex("next");
     });
-};
-
-// 歌曲进度条更新
-const sliderDragEnd = () => {
-  songTimeSliderUpdate(music.getPlaySongTime.barMoveDistance);
-  music.setPlayState(true);
-};
-const songTimeSliderUpdate = (val) => {
-  if (player.value && music.getPlaySongTime?.duration) {
-    const currentTime = (music.getPlaySongTime.duration / 100) * val;
-    setSeek(player.value, currentTime);
-  }
 };
 
 // 静音事件
@@ -462,7 +443,7 @@ watch(
   .slider {
     position: absolute;
     top: -12px;
-    left: 0;
+    left: -30px;
     width: 100%;
     display: flex;
     flex-direction: row;
@@ -473,19 +454,19 @@ watch(
     @media (max-width: 640px) {
       top: -8px;
 
-        span {
-          display: none;
+      span {
+        display: none;
       }
     }
 
-      span {
-        font-size: 12px;
-        white-space: nowrap;
-        background-color: var(--n-color);
-        outline: 1px solid var(--n-border-color);
-        padding: 2px 8px;
-        border-radius: 25px;
-        margin: 0 2px;
+    span {
+      font-size: 12px;
+      white-space: nowrap;
+      background-color: var(--n-color);
+      outline: 1px solid var(--n-border-color);
+      padding: 2px 8px;
+      border-radius: 25px;
+      margin: 0 2px;
     }
 
     .progress-slider {
@@ -503,25 +484,19 @@ watch(
         background-color: var(--main-color);
         border-radius: 25px;
       }
-
-      .custom-thumb {
+      
+      :deep(.n-slider-handle) {
         width: 12px;
         height: 12px;
-        border-radius: 50%;
         background-color: var(--main-color);
-        box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
         border: 2px solid #fff;
-        transition: transform 0.2s;
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
       }
+    }
 
-      :deep(.n-slider-handle) {
-        box-shadow: none;
-        background-color: transparent;
-        
-        &:hover .custom-thumb {
-          transform: scale(1.1);
-        }
-      }
+    .progress-thumb {
+      background-color: var(--main-color);
+      border: 2px solid #fff;
     }
 
     .slider-tooltip {
@@ -759,24 +734,29 @@ watch(
           --n-handle-size: 12px;
           --n-rail-height: 3px;
           
-          .custom-thumb {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: var(--main-color);
-            box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
-            border: 2px solid #fff;
-            transition: transform 0.2s;
+          :deep(.n-slider-rail) {
+            background-color: var(--n-border-color);
+            border-radius: 25px;
+            height: 3px;
           }
 
-          :deep(.n-slider-handle) {
-            box-shadow: none;
-            background-color: transparent;
-            
-            &:hover .custom-thumb {
-              transform: scale(1.1);
-            }
+          :deep(.n-slider-rail__fill) {
+            background-color: var(--main-color);
+            border-radius: 25px;
           }
+          
+          :deep(.n-slider-handle) {
+            width: 12px;
+            height: 12px;
+            background-color: var(--main-color);
+            border: 2px solid #fff;
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+          }
+        }
+
+        .volume-thumb {
+          background-color: var(--main-color);
+          border: 2px solid #fff;
         }
       }
     }
