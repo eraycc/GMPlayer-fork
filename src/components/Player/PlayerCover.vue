@@ -54,13 +54,17 @@
       </div>
       <div class="time">
         <span>{{ music.getPlaySongTime.songTimePlayed }}</span>
-        <player-slider
-          v-model:value="music.getPlaySongTime.barMoveDistance" 
-          :duration="music.getPlaySongTime.duration"
-          :show-tooltip="false"
-          slider-class="time-slider"
-          :is-progress="true"
-        />
+        <n-slider v-model:value="music.getPlaySongTime.barMoveDistance" 
+          @start="music.setPlayState(false)"
+          @stop="sliderDragEnd"
+          @update:value="(val) => songTimeSliderUpdate(val)"
+          :tooltip="false"
+          :step="0.0001"
+          class="time-slider">
+          <template #thumb>
+            <div class="custom-thumb"></div>
+          </template>
+        </n-slider>
         <span>{{ music.getPlaySongTime.songTimeDuration }}</span>
       </div>
       <div class="buttons">
@@ -112,15 +116,16 @@
               : $t("general.name.unmute")
           }}
         </n-popover>
-        <player-slider
-          v-model:value="persistData.playVolume"
-          :show-tooltip="false" 
+        <n-slider v-model:value="persistData.playVolume"
+          :tooltip="false" 
           :min="0" 
           :max="1" 
           :step="0.001"
-          slider-class="volume-slider"
-          :is-progress="false"
-        />
+          class="volume-slider">
+          <template #thumb>
+            <div class="custom-thumb"></div>
+          </template>
+        </n-slider>
         <span>100%</span>
       </div>
     </div>
@@ -149,12 +154,23 @@ import { useRouter } from "vue-router";
 import { setSeek } from "@/utils/Player";
 import AllArtists from "@/components/DataList/AllArtists.vue";
 import { NSlider } from "naive-ui";
-import PlayerSlider from "./PlayerSlider.vue";
 
 const router = useRouter();
 const music = musicStore();
 const user = userStore();
 const { persistData } = storeToRefs(music);
+
+// 歌曲进度条更新
+const sliderDragEnd = () => {
+  songTimeSliderUpdate(music.getPlaySongTime.barMoveDistance);
+  music.setPlayState(true);
+};
+const songTimeSliderUpdate = (val) => {
+  if (typeof $player !== "undefined" && music.getPlaySongTime?.duration) {
+    const currentTime = (music.getPlaySongTime.duration / 100) * val;
+    setSeek($player, currentTime);
+  }
+};
 
 // 页面跳转
 const routerJump = (url, query) => {
@@ -347,21 +363,26 @@ const volumeMute = () => {
           background-color: var(--main-cover-color);
           border-radius: 25px;
         }
-        
-        :deep(.n-slider-handle) {
+
+        .custom-thumb {
           width: 12px;
           height: 12px;
+          border-radius: 50%;
           background-color: var(--main-cover-color);
-          border: 2px solid rgba(255, 255, 255, 0.9);
           box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+          border: 2px solid rgba(255, 255, 255, 0.9);
+          transition: transform 0.2s;
+        }
+
+        :deep(.n-slider-handle) {
+          box-shadow: none;
+          background-color: transparent;
+          
+          &:hover .custom-thumb {
+            transform: scale(1.1);
+          }
         }
       }
-    }
-
-    .time-thumb,
-    .volume-thumb {
-      background-color: var(--main-cover-color);
-      border: 2px solid rgba(255, 255, 255, 0.9);
     }
 
     .buttons {
