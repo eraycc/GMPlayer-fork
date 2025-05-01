@@ -34,16 +34,39 @@ const props = withDefaults(defineProps<BackgroundRenderProps>(), {
 
 const coreBGRenderRef = ref<AbstractBaseRenderer>();
 const wrapperRef = ref<HTMLDivElement | null>(null);
+const isRendered = ref(false);
+
+// 强制渲染函数
+const forceRender = () => {
+  if (!coreBGRenderRef.value) return;
+  
+  // 记住原始播放状态
+  const originalPlayingState = props.playing;
+  
+  // 强制启动渲染器
+  coreBGRenderRef.value.resume();
+  
+  // 使用多个连续的动画帧确保渲染完成
+  const renderFrames = (count: number) => {
+    if (count <= 0) {
+      // 完成渲染后，如果原始状态是暂停，则恢复暂停
+      if (!originalPlayingState) {
+        coreBGRenderRef.value?.pause();
+      }
+      isRendered.value = true;
+      return;
+    }
+    
+    requestAnimationFrame(() => renderFrames(count - 1));
+  };
+  
+  renderFrames(3); // 尝试渲染3帧以确保效果显示
+};
 
 onMounted(() => {
   coreBGRenderRef.value = CoreBackgroundRender.new(props.renderer ?? MeshGradientRenderer);
   if (props.album) coreBGRenderRef.value?.setAlbum(props.album);
   if (props.fps) coreBGRenderRef.value?.setFPS(props.fps);
-  if (props.playing) {
-    coreBGRenderRef.value?.resume();
-  } else {
-    coreBGRenderRef.value?.pause();
-  }
   if (props.flowSpeed) coreBGRenderRef.value?.setFlowSpeed(props.flowSpeed);
   coreBGRenderRef.value?.setStaticMode(props.staticMode);
   coreBGRenderRef.value?.setRenderScale(props.renderScale);
@@ -55,6 +78,27 @@ onMounted(() => {
     el.style.width = "100%";
     el.style.height = "100%";
     wrapperRef.value?.appendChild(el);
+    
+    // 等待DOM渲染完成后强制显示背景
+    setTimeout(() => {
+      if (!isRendered.value) {
+        forceRender();
+      }
+    }, 100);
+    
+    // 如果第一次尝试失败，再尝试一次
+    setTimeout(() => {
+      if (!isRendered.value) {
+        forceRender();
+      }
+    }, 500);
+  }
+  
+  // 根据props.playing设置初始状态
+  if (props.playing) {
+    coreBGRenderRef.value?.resume();
+  } else {
+    coreBGRenderRef.value?.pause();
   }
 });
 
@@ -101,5 +145,6 @@ watch(() => props.hasLyric, (newValue) => {
 defineExpose({
   wrapperEl: wrapperRef,
   bgRender: coreBGRenderRef,
+  forceRender
 });
 </script>

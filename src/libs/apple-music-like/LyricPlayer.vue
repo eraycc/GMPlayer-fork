@@ -80,6 +80,7 @@ const mainColor = computed(() => {
 // 获取当前歌词
 const currentLyrics = computed<LyricLine[]>(() => {
   const songLyric = music.songLyric || { lrcAMData: [], yrcAMData: [] };
+  console.log(songLyric);
   const lyricData = createLyricsProcessor(songLyric, { 
     showYrc: setting.showYrc,
     showRoma: setting.showRoma,

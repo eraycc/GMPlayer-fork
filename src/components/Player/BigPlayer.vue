@@ -1,6 +1,6 @@
 <template>
   <Transition name="up" mode="out-in">
-    <div v-if="music.showBigPlayer" class="bplayer" :style="[
+    <div v-if="music.showBigPlayer" :class="['bplayer', `bplayer-${setting.backgroundImageShow}`]" :style="[
       music.getPlaySongData && setting.backgroundImageShow === 'blur' ? 'background-image: url(' +
         music.getPlaySongData.album.picUrl.replace(/^http:/, 'https:') +
         '?param=50y50)'
@@ -23,7 +23,7 @@
       <template v-if="setting.backgroundImageShow === 'eplor'">
         <BackgroundRender 
           :fps="music.getPlayState ? setting.fps : 0"
-          :playing="music.getPlayState"
+          :playing="actualPlayingProp"
           :flowSpeed="music.getPlayState ? (setting.dynamicFlowSpeed ? dynamicFlowSpeed : setting.flowSpeed) : 0"
           :album="setting.albumImageUrl === 'none' ? music.getPlaySongData.album.picUrl.replace(/^http:/, 'https:') : setting.albumImageUrl"
           :renderScale="setting.renderScale" 
@@ -155,6 +155,15 @@ import BackgroundRender from "@/libs/apple-music-like/BackgroundRender.vue";
 import { throttle } from "throttle-debounce"
 import { analyzeAudioIntensity } from "../../utils/fftIntensityAnalyze";
 import { storeToRefs } from "pinia";
+import {
+  onMounted,
+  nextTick,
+  watch,
+  ref,
+  shallowRef,
+  computed,
+  onBeforeUnmount,
+} from "vue";
 
 const router = useRouter();
 const music = musicStore();
@@ -163,8 +172,24 @@ const setting = settingStore();
 
 const { songPicGradient, songPicColor } = storeToRefs(site)
 
-// 动态流速
-const dynamicFlowSpeed = ref(2)
+// State to force playing=true for the initial tick only
+const forcePlaying = ref(true);
+
+// Computed property to determine the actual value for the :playing prop
+const actualPlayingProp = computed(() => {
+  const isForced = forcePlaying.value;
+  const realState = music.getPlayState;
+  // Calculate the result based on the logic: force true initially, then follow real state
+  const result = isForced || realState;
+  // Log the dependencies and the result for debugging
+  console.log(
+    `-- computed actualPlayingProp -- forcePlaying: ${isForced}, music.getPlayState: ${realState}, result: ${result}`
+  );
+  return result;
+});
+
+// Keep the dynamic flow speed logic if needed by :flowSpeed binding
+const dynamicFlowSpeed = ref(2);
 
 // 工具栏显隐
 const menuShow = ref(false);
@@ -265,10 +290,24 @@ const changePwaColor = () => {
   }
 };
 
-onMounted(async () => {
-  console.log('music data', music.getPlaySongData)
-  nextTick().then(() => {
-    // 滚动歌词
+onMounted(() => {
+  console.log("BigPlayer onMounted - forcePlaying initially:", forcePlaying.value);
+  nextTick(() => {
+    console.log(
+      "BigPlayer nextTick starts - forcePlaying BEFORE change:",
+      forcePlaying.value
+    );
+    // After the first tick, disable the forcing flag
+    forcePlaying.value = false;
+    console.log(
+      "BigPlayer nextTick ends - forcePlaying AFTER change:",
+      forcePlaying.value
+    );
+
+    // Existing logic from nextTick
+    if (setting.backgroundImageShow === "eplor") {
+      console.log("Eplor mode active on mount.");
+    }
     lyricsScroll(music.getPlaySongLyricIndex);
   });
 });
@@ -376,10 +415,6 @@ watch(
       background-color: #00000060;
     }
 
-    &:not(.eplor) {
-      backdrop-filter: blur(20px);
-    }
-
     &.blur {
       display: flex;
       align-items: center;
@@ -422,6 +457,13 @@ watch(
 
     &.blur {
       background-color: #00000060;
+    }
+  }
+
+  &.bplayer-eplor {
+    .gray {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
   }
 

@@ -1,9 +1,52 @@
 import { settingStore } from "@/store";
 
+// 定义语言类型
+type LanguageType = "zh-CN" | "en";
+
+// 定义每种语言的文本类型
+interface LanguageTexts {
+  million: string;
+  billion: string;
+  year: string;
+  month: string;
+  day: string;
+  just: string;
+  minutesAgo: string;
+  yesterday: string;
+  lightMode: string;
+  darkMode: string;
+  personalFmError: string;
+  fmTrashError: string;
+  needLogin: string;
+  loveSong: string;
+  loveSongError: string;
+  loveSongRepeat: string;
+  loveSongRemove: string;
+  loveSongNoFound: string;
+  getDataError: string;
+  getDaraEmpty: string;
+  getLrcError: string;
+  random: string;
+  single: string;
+  normal: string;
+  playError: string;
+  addSongToNext: string;
+  removeSong: string;
+  songLoadError?: string;
+  songPlayError?: string;
+  songLoadTest?: string;
+  songNotDetails: string;
+}
+
+// 定义语言数据类型
+interface LanguageData {
+  [key: string]: LanguageTexts;
+}
+
 /**
  * 翻译文本数据
  */
-const languageData = {
+const languageData: LanguageData = {
   "zh-CN": {
     million: "万",
     billion: "亿",
@@ -22,7 +65,6 @@ const languageData = {
     loveSongError: "喜欢音乐时发生错误",
     loveSongRepeat: "我喜欢的音乐中已存在该歌曲",
     loveSongRemove: "已从我喜欢的音乐中移除",
-    loveSongRemoveError: "取消喜欢音乐时发生错误",
     loveSongNoFound: "我喜欢的列表中未找到该歌曲",
     getDataError: "数据获取失败，请刷新后重试",
     getDaraEmpty: "数据为空",
@@ -56,7 +98,6 @@ const languageData = {
     loveSongError: "An error occurred while liking music",
     loveSongRepeat: "The song already exists in my favorite music",
     loveSongRemove: "Removed from my favorite music",
-    loveSongError: "An error occurred while unliking music",
     loveSongNoFound: "The song was not found in my favorite list",
     getDataError: "Data acquisition failed, please refresh and try again",
     getDaraEmpty: "Data is empty",
@@ -73,13 +114,13 @@ const languageData = {
 
 /**
  * 返回翻译文本
- * @param {String} type 文本类别
- * @returns {Object} 对应语种文本
+ * @param type 文本类别
+ * @returns 对应语种文本
  */
-const getLanguageData = (type) => {
+const getLanguageData = (type: keyof LanguageTexts): string | null => {
   try {
     const setting = settingStore();
-    const language = setting.language;
+    const language = setting.language as LanguageType;
     return languageData[language][type];
   } catch (err) {
     console.log("Failed to get translated:" + err);
@@ -87,4 +128,4 @@ const getLanguageData = (type) => {
   }
 };
 
-export default getLanguageData;
+export default getLanguageData; 
