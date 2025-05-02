@@ -12,18 +12,33 @@
       </Transition>
     </div>
     <div class="center">
-      <router-link class="link" to="/">{{ $t("nav.home") }}</router-link>
+      <router-link
+        class="link"
+        to="/"
+        @mouseenter="onLinkEnter"
+        @mouseleave="onLinkLeave"
+      >{{ $t("nav.home") }}</router-link>
       <n-dropdown
         trigger="hover"
         :options="discoverOptions"
         @select="menuSelect"
       >
-        <router-link class="link" to="/discover">
+        <router-link
+          class="link"
+          to="/discover"
+          @mouseenter="onLinkEnter"
+          @mouseleave="onLinkLeave"
+        >
           {{ $t("nav.discover") }}
         </router-link>
       </n-dropdown>
       <n-dropdown trigger="hover" :options="userOptions" @select="menuSelect">
-        <router-link class="link" to="/user">{{ $t("nav.user") }}</router-link>
+        <router-link
+          class="link"
+          to="/user"
+          @mouseenter="onLinkEnter"
+          @mouseleave="onLinkLeave"
+        >{{ $t("nav.user") }}</router-link>
       </n-dropdown>
     </div>
     <div class="right">
@@ -88,6 +103,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import AboutSite from "@/components/DataModal/AboutSite.vue";
 import SearchInp from "@/components/SearchInp/index.vue";
+import gsap from 'gsap';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -97,6 +113,15 @@ const setting = settingStore();
 const aboutSiteRef = ref(null);
 const timeOut = ref(null);
 const logoUrl = import.meta.env.VITE_SITE_LOGO;
+
+// 添加动画处理函数
+const onLinkEnter = (event) => {
+  gsap.to(event.target, { scale: 1.1, duration: 0.2, ease: 'power1.out' });
+};
+
+const onLinkLeave = (event) => {
+  gsap.to(event.target, { scale: 1, duration: 0.2, ease: 'power1.in' });
+};
 
 // 下拉菜单显隐
 const showDropdown = ref(false);

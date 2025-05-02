@@ -11,12 +11,10 @@
       <n-tab name="player">{{ $t("setting.player") }}</n-tab>
       <n-tab name="other">{{ $t("general.type.other") }}</n-tab>
     </n-tabs>
-    <main class="content">
-      <router-view v-slot="{ Component }">
+    <main class="content" style="position: relative; overflow: hidden;">
+      <router-view v-slot="{ Component, route }">
         <keep-alive>
-          <Transition name="move" mode="out-in">
-            <component :is="Component" />
-          </Transition>
+          <component :is="Component" :key="route.path" />
         </keep-alive>
       </router-view>
     </main>
@@ -133,16 +131,5 @@ onMounted(() => {
       }
     }
   }
-}
-// 路由跳转动画
-.move-enter-active,
-.move-leave-active {
-  transition: all 0.2s ease;
-}
-
-.move-enter-from,
-.move-leave-to {
-  opacity: 0;
-  transform: translateX(10px);
 }
 </style>

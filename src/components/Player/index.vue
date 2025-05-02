@@ -239,7 +239,12 @@ const player = ref(null);
 // 获取歌曲播放数据
 const getPlaySongData = (data, level = setting.songLevel) => {
   try {
+    if (!data || !data.id) {
+      console.error("[Player] getPlaySongData called with invalid data:", data);
+      return;
+    }
     const { id, fee, pc } = data;
+    console.log(`[Player] getPlaySongData called for ID: ${id}, Fee: ${fee}, PC: ${pc}, Level: ${level}`);
     // VIP 歌曲或需要购买专辑
     if (
       useUnmServerHas &&
@@ -247,39 +252,72 @@ const getPlaySongData = (data, level = setting.songLevel) => {
       !pc &&
       (fee === 1 || fee === 4)
     ) {
-      console.log("网易云解灰");
+      console.log("[Player] Attempting UNM server for VIP/paid song.");
       getMusicNumUrlData(id);
     }
     // 免费或无版权
     else {
       checkMusicCanUse(id).then((res) => {
+        console.log(`[Player] checkMusicCanUse response for ${id}:`, res);
         if (res.success) {
-          console.log("当前歌曲可用");
+          console.log("[Player] Song is usable via official API.");
           if (!pc && (fee === 1 || fee === 4))
             $message.info(t("general.message.vipTip"));
           // 获取音乐地址
           getMusicUrl(id, level).then((res) => {
-            player.value = createSound(
-              res.data[0].url.replace(/^http:/, "https:")
-            );
+            console.log(`[Player] getMusicUrl response for ${id}:`, res);
+            if (res.data && res.data[0] && res.data[0].url) {
+              const url = res.data[0].url.replace(/^http:/, "https:");
+              console.log(`[Player] Creating sound instance with official URL: ${url}`);
+              player.value = createSound(url);
+            } else {
+              console.error(`[Player] Invalid URL data from getMusicUrl for ${id}:`, res);
+              // Fallback to UNM if available? Or just error out? Let's try UNM.
+              if (useUnmServerHas && setting.useUnmServer) {
+                 console.warn(`[Player] Official URL invalid for ${id}, falling back to UNM.`);
+                 getMusicNumUrlData(id);
+              } else {
+                $message.warning(t("general.message.playError"));
+                music.setPlaySongIndex("next");
+              }
+            }
+          }).catch(err => {
+              console.error(`[Player] Error fetching official Music URL for ${id}:`, err);
+              // Fallback to UNM if available?
+              if (useUnmServerHas && setting.useUnmServer) {
+                 console.warn(`[Player] Official URL fetch failed for ${id}, falling back to UNM.`);
+                 getMusicNumUrlData(id);
+              } else {
+                $message.warning(t("general.message.playError"));
+                music.setPlaySongIndex("next");
+              }
           });
         } else {
+          console.warn(`[Player] Song ${id} not usable via official API.`);
           if (useUnmServerHas && setting.useUnmServer) {
+            console.log(`[Player] Official check failed for ${id}, falling back to UNM.`);
             getMusicNumUrlData(id);
           } else {
             $message.warning(t("general.message.playError"));
             music.setPlaySongIndex("next");
           }
         }
+      }).catch(err => {
+          console.error(`[Player] Error calling checkMusicCanUse for ${id}:`, err);
+          $message.warning(t("general.message.playError"));
+          music.setPlaySongIndex("next");
       });
     }
-    // 获取歌词
-    getMusicNewLyric(id).then((res) => {
-      music.setPlaySongLyric(res);
+    // 获取歌词 (可以在获取 URL 的同时进行)
+    getMusicNewLyric(id).then(res => {
+        console.log(`[Player] Lyric response for ${id}:`, res);
+        music.setPlaySongLyric(res);
+    }).catch(err => {
+        console.error(`[Player] Error fetching lyrics for ${id}:`, err);
     });
   } catch (err) {
+    console.error("[Player] Error in getPlaySongData main block:", err);
     if (music.getPlaylists[0] && music.getPlayState) {
-      console.log("当前歌曲所有音源匹配失败：" + err);
       $message.warning(t("general.message.playError"));
       music.setPlaySongIndex("next");
     }
@@ -301,23 +339,30 @@ const renderIcon = (icon) => {
 
 // 网易云解灰
 const getMusicNumUrlData = (id) => {
+  console.log(`[Player] getMusicNumUrlData called for ID: ${id}`);
   getMusicNumUrl(id)
     .then((res) => {
-      if (res.code === 200) {
+      console.log(`[Player] getMusicNumUrl response for ${id}:`, res);
+      if (res.code === 200 && res.data && res.data.url) {
         const songUrl = res.data.url.replace(/^http:/, "");
         // 匹配酷我域名
-        const pattern = /kuwo\.cn/i;
+        const pattern = /kuwo\\.cn/i;
         if (pattern.test(songUrl) && res.data?.proxyUrl) {
-          player.value = createSound(res.data.proxyUrl);
-          console.log("替换成功：" + res.data.proxyUrl);
+          const proxyUrl = res.data.proxyUrl; // Assuming proxyUrl doesn't need https replace
+          console.log(`[Player] Creating sound instance with UNM Proxy URL: ${proxyUrl}`);
+          player.value = createSound(proxyUrl);
         } else {
+          console.log(`[Player] Creating sound instance with UNM URL: ${songUrl}`);
           player.value = createSound(songUrl);
-          console.log("替换成功：" + songUrl);
         }
+      } else {
+        console.error(`[Player] Invalid data from getMusicNumUrl for ${id}:`, res);
+        $message.warning(t("general.message.playError"));
+        music.setPlaySongIndex("next");
       }
     })
     .catch((err) => {
-      console.log("解灰失败：" + err);
+      console.error(`[Player] Error in getMusicNumUrl request for ${id}:`, err);
       $message.warning(t("general.message.playError"));
       music.setPlaySongIndex("next");
     });
@@ -390,11 +435,14 @@ onMounted(() => {
 
 // 监听当前音乐数据变化
 watch(
-  () => music.getPlaySongData,
-  (val) => {
-    music.setPlaySongTime({ currentTime: 0, duration: 0 });
-    songChange(val);
-  }
+  () => (music ? music.getPlaySongData : null),
+  (val, oldVal) => {
+    if (val !== oldVal) {
+      music.setPlaySongTime({ currentTime: 0, duration: 0 });
+      songChange(val);
+    }
+  },
+  { deep: true }
 );
 
 // 监听当前音量数据变化
@@ -409,13 +457,28 @@ watch(
 watch(
   () => music.getPlayState,
   (val) => {
+    console.log(`[Player] Play state changed to: ${val}. Player instance:`, player.value);
     nextTick().then(() => {
       if (player.value && !music.isLoadingSong) {
-        fadePlayOrPause(
-          player.value,
-          val ? "play" : "pause",
-          persistData.value.playVolume
-        );
+         const hPlayer = player.value; // Assuming player.value is the Howl instance
+         if (typeof hPlayer.playing !== 'function') {
+           console.error("[Player] player.value is not a valid Howler instance or 'playing' method missing", hPlayer);
+           return;
+         }
+         const isPlaying = hPlayer.playing();
+         console.log(`[Player] Current Howler playing state: ${isPlaying}`);
+
+         if (val && !isPlaying) {
+            console.log("[Player] Calling fadePlayOrPause with 'play'");
+            fadePlayOrPause(player.value, "play", persistData.value.playVolume);
+         } else if (!val && isPlaying) {
+            console.log("[Player] Calling fadePlayOrPause with 'pause'");
+            fadePlayOrPause(player.value, "pause", persistData.value.playVolume);
+         } else {
+            console.log("[Player] fadePlayOrPause skipped, already in desired state or player not ready.");
+         }
+      } else {
+         console.warn(`[Player] Skipping fadePlayOrPause. Player: ${player.value}, isLoadingSong: ${music.isLoadingSong}`);
       }
     });
   }

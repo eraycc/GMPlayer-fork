@@ -7,6 +7,8 @@ import viteCompression from "vite-plugin-compression";
 import AutoImport from "unplugin-auto-import/vite";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
+import { VueMcp } from 'vite-plugin-vue-mcp'
+import vueDevTools from 'vite-plugin-vue-devtools'
 import Components from "unplugin-vue-components/vite";
 
 // https://vitejs.dev/config/
@@ -14,6 +16,8 @@ export default ({ mode }) =>
   defineConfig({
     plugins: [
       vue(),
+      VueMcp(),
+      vueDevTools(),
       wasm(),
       topLevelAwait({
         promiseExportName: '__tla',

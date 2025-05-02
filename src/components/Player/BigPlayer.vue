@@ -1,13 +1,26 @@
 <template>
-  <Transition name="up" mode="out-in">
-    <div v-if="music.showBigPlayer" :class="['bplayer', `bplayer-${setting.backgroundImageShow}`]" :style="[
-      music.getPlaySongData && setting.backgroundImageShow === 'blur' ? 'background-image: url(' +
-        music.getPlaySongData.album.picUrl.replace(/^http:/, 'https:') +
-        '?param=50y50)'
-        : '',
-      `--cover-bg: ${songPicGradient}`,
-      `--main-cover-color: rgb(${setting.immersivePlayer ? songPicColor : '255,255,255'})`
-    ]">
+  <AnimatePresence>
+    <Motion
+      tag="div"
+      v-if="music.showBigPlayer"
+      :initial="{ opacity: 0, y: '100%' }"
+      :animate="{ opacity: 1, y: 0 }"
+      :exit="{ opacity: 0, y: '100%' }"
+      :transition="{ duration: 0.5, easing: 'ease-in-out' }"
+      :class="[
+        'bplayer',
+        `bplayer-${setting.backgroundImageShow}`,
+      ]"
+      :style="[
+        music.getPlaySongData && setting.backgroundImageShow === 'blur'
+          ? 'background-image: url(' +
+            music.getPlaySongData.album.picUrl.replace(/^http:/, 'https:') +
+            '?param=50y50)'
+          : '',
+        `--cover-bg: ${songPicGradient}`,
+        `--main-cover-color: rgb(${setting.immersivePlayer ? songPicColor : '255,255,255'})`,
+      ]"
+    >
       <!-- 切歌取色背景过度 -->
       <Transition name="fade" mode="out-in">
         <div :key="`bg--${songPicGradient}`" :class="['overlay', setting.backgroundImageShow]">
@@ -124,8 +137,8 @@
       <Spectrum v-if="setting.musicFrequency" :height="60" :show="music.showBigPlayer" />
       <!-- 歌词设置 -->
       <LyricSetting ref="LyricSettingRef" />
-    </div>
-  </Transition>
+    </Motion>
+  </AnimatePresence>
 </template>
 
 <script setup>
@@ -164,6 +177,7 @@ import {
   computed,
   onBeforeUnmount,
 } from "vue";
+import { Motion, AnimatePresence } from "motion-v";
 
 const router = useRouter();
 const music = musicStore();

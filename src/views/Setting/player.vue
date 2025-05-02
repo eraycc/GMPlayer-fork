@@ -89,6 +89,21 @@
     <n-card class="set-item">
       <div class="name">
         <div class="dev">
+           使用 Lyric Atlas API
+          <n-tag round :bordered="false" size="small" type="warning">
+            {{ $t("setting.dev") }}
+            <template #icon>
+              <n-icon :component="Code" />
+            </template>
+          </n-tag>
+        </div>
+        <span class="tip">从备用 API 获取歌词 (需要配置 API 地址)</span>
+      </div>
+      <n-switch v-model:value="useLyricAtlasAPI" :round="false" />
+    </n-card>
+    <n-card class="set-item">
+      <div class="name">
+        <div class="dev">
           {{ $t("setting.showYrc") }}
           <n-tag round :bordered="false" size="small" type="warning">
             {{ $t("setting.dev") }}
@@ -268,6 +283,7 @@ import { storeToRefs } from "pinia";
 import { settingStore } from "@/store";
 import { useI18n } from "vue-i18n";
 import { Code } from "@icon-park/vue-next";
+import { watch } from "vue";
 
 const { t } = useI18n();
 
@@ -299,9 +315,15 @@ const {
   lyricFontWeight,
   lyricLetterSpacing,
   lyricLineHeight,
+  useLyricAtlasAPI,
 } = storeToRefs(setting);
 console.log('SETTING', fps)
 const isModalOn = ref(false)
+
+// 监听 Lyric Atlas API 设置变化
+watch(useLyricAtlasAPI, (newValue, oldValue) => {
+  console.log(`[Setting] useLyricAtlasAPI changed from ${oldValue} to ${newValue}`);
+});
 
 // 歌词位置
 const lyricsPositionOptions = [
