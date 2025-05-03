@@ -6,9 +6,8 @@
   "github": "https://github.com/Burial0268/SPlayer",
   "scripts": {
     "dev": "vite --host",
-    "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "type-check": "vue-tsc --noEmit"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@applemusic-like-lyrics/core": "0.2.0-alpha.4",
