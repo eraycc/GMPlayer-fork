@@ -19,6 +19,8 @@ const useSettingDataStore = defineStore("settingData", {
       autoSignIn: true,
       // 列表点击方式
       listClickMode: "dblclick",
+      // 是否使用 Lyric Atlas API
+      useLyricAtlasAPI: false,
       // 播放器样式
       playerStyle: "cover",
       // 底栏歌词显示

@@ -69,6 +69,19 @@
               {{ t('setting.eplorySetting.albumImageUrl.tip') }}
             </template>
           </n-form-item>
+          <!-- Lyric Atlas API Switch -->
+          <n-form-item :label="$t('setting.player.useLyricAtlas')">
+            <template #label>
+              {{ $t('setting.player.useLyricAtlas') }}
+              <n-tooltip trigger="hover">
+                <template #trigger>
+                  <n-icon class="tip" size="18" :component="Help" />
+                </template>
+                {{ $t('setting.player.useLyricAtlasTip') }}
+              </n-tooltip>
+            </template>
+            <n-switch v-model:value="useLyricAtlasAPI" />
+          </n-form-item>
         </n-form>
       </n-modal>
     </n-card>
@@ -282,7 +295,7 @@
 import { storeToRefs } from "pinia";
 import { settingStore } from "@/store";
 import { useI18n } from "vue-i18n";
-import { Code } from "@icon-park/vue-next";
+import { Code, Help } from "@icon-park/vue-next";
 import { watch } from "vue";
 
 const { t } = useI18n();

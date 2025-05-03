@@ -3,7 +3,7 @@
     ref="lyricPlayerRef" 
     :lyricLines="currentLyrics" 
     :currentTime="currentTime"
-    :playing="music.playState"
+    :playing="playState"
     :alignAnchor="alignAnchor"
     :alignPosition="alignPosition" 
     :enableSpring="setting.showYrcAnimation"
@@ -30,15 +30,22 @@ const site = siteStore();
 const music = musicStore();
 const setting = settingStore();
 
+const playState = ref(false);
+const currentTime = ref(0);
+
+watch(() => music.playState, (newState) => {
+  playState.value = newState;
+}, {immediate: true});
+
 const emit = defineEmits<{
   'line-click': [e: { line: { getLine: () => { startTime: number } } }],
   lrcTextClick: [time: number]
 }>();
 
 // 计算当前播放时间
-const currentTime = computed(() => 
-  music.persistData.playSongTime.currentTime * 1000
-);
+watch(() => music.persistData.playSongTime.currentTime, (newTime) => {
+  currentTime.value = newTime * 1000;
+});
 
 // 计算对齐方式
 const alignAnchor = computed(() => 
@@ -54,6 +61,7 @@ const lyricStyles = computed(() => ({
   '--amll-lp-color': mainColor.value,
   '--amll-lyric-player-font-size': `${setting.lyricsFontSize * 11}px`,
   '--amll-lp-height': setting.lyricLineHeight,
+  '--amll-lp-word-spacing': '-0.03em',
   'font-weight': setting.lyricFontWeight,
   'font-family': setting.lyricFont,
   'letter-spacing': setting.lyricLetterSpacing,
@@ -79,13 +87,25 @@ const mainColor = computed(() => {
 
 // 获取当前歌词
 const currentLyrics = computed<LyricLine[]>(() => {
-  const songLyric = music.songLyric || { lrcAMData: [], yrcAMData: [] };
-  console.log(songLyric);
+  const songLyric = music.songLyric || { lrcAMData: [], yrcAMData: [], hasTTML: false, ttml: [] };
+  
+  // 记录歌词数据来源信息
+  if (songLyric.hasTTML && songLyric.ttml && songLyric.ttml.length > 0) {
+    console.log("[LyricPlayer] 检测到TTML格式歌词数据，行数:", songLyric.ttml.length);
+  } else if (setting.showYrc && songLyric.yrcAMData?.length) {
+    console.log("[LyricPlayer] 使用YRC格式歌词数据，行数:", songLyric.yrcAMData.length);
+  } else if (songLyric.lrcAMData?.length) {
+    console.log("[LyricPlayer] 使用LRC格式歌词数据，行数:", songLyric.lrcAMData.length);
+  } else {
+    console.log("[LyricPlayer] 未检测到有效歌词数据");
+  }
+  
   const lyricData = createLyricsProcessor(songLyric, { 
     showYrc: setting.showYrc,
     showRoma: setting.showRoma,
     showTransl: setting.showTransl
   });
+  
   return lyricData;
 });
 
@@ -93,7 +113,7 @@ watch(() => music.playState, (newState) => {
   if (newState) {
     lyricPlayerRef.value?.lyricPlayer?.value?.setCurrentTime(currentTime.value);
   }
-});
+}, { immediate: true });
 </script>
 
 

@@ -1,4 +1,5 @@
 import axios from "@/utils/request";
+import { LyricService } from "@/services/lyricsService";
 
 /**
  * 歌曲部分
@@ -62,33 +63,22 @@ export const getMusicNumUrl = async (id) => {
 };
 
 /**
- * 获取指定音乐的歌词
+ * 获取指定音乐的歌词 (Unified)
  * @param {number} id - 要获取歌词的音乐ID
+ * @param {boolean} [useLyricAtlas=false] - 是否使用 Lyric Atlas API。默认为 false。
+ * @returns {Promise<object|null>} Returns LyricData object or null
  */
-export const getMusicLyric = (id) => {
-  return axios({
-    method: "GET",
-    hiddenBar: true,
-    url: "/lyric",
-    params: {
-      id,
-    },
-  });
-};
-
-/**
- * 获取指定音乐的逐字歌词
- * @param {number} id - 要获取逐字歌词的音乐ID
- */
-export const getMusicNewLyric = (id) => {
-  return axios({
-    method: "GET",
-    hiddenBar: true,
-    url: "/lyric/new",
-    params: {
-      id,
-    },
-  });
+export const getUnifiedLyric = async (id, useLyricAtlas = false) => {
+  const lyricService = new LyricService(useLyricAtlas);
+  try {
+    // Directly return the result from the service, which is in LyricData format
+    const lyricData = await lyricService.fetchLyric(id);
+    return lyricData;
+  } catch (error) {
+    console.error(`Failed to fetch unified lyric for id ${id}:`, error);
+    // Return null or an error object compatible with parseLyric error handling
+    return null; // Or { code: 500, message: 'Failed to fetch' }
+  }
 };
 
 /**

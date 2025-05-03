@@ -28,6 +28,8 @@ const useMusicDataStore = defineStore("musicData", {
         yrc: [],
         lrcAMData: [],
         yrcAMData: [],
+        hasTTML: false,     // 是否拥有TTML格式歌词
+        ttml: [],           // TTML解析后的数据
         hasLrcTran: false,
         hasLrcRoma: false,
         hasYrc: false,
@@ -308,12 +310,98 @@ const useMusicDataStore = defineStore("musicData", {
     },
     // 歌词处理
     setPlaySongLyric(value) {
-      if (value.lrc) {
+      if (value) {
         try {
-          this.songLyric = parseLyric(value);
+          // 确保歌词数据中始终有lrc歌词数组
+          if (!value.lrc || value.lrc.length === 0) {
+            console.log("注意：歌词数据中缺少lrc数组，尝试从yrc创建");
+            
+            // 如果有yrc数据但没有lrc数据，尝试从yrc创建lrc
+            if (value.yrc && value.yrc.length > 0) {
+              value.lrc = value.yrc.map(yrcLine => ({
+                time: yrcLine.time,
+                content: yrcLine.TextContent
+              }));
+              console.log("已从yrc数据创建lrc数组");
+            } else {
+              // 如果没有yrc数据，创建占位符lrc
+              value.lrc = [
+                { time: 0, content: "暂无歌词" },
+                { time: 999, content: "No Lyrics Available" }
+              ];
+              console.log("创建了占位符lrc数组");
+            }
+          }
+          
+          // 确保lrcAMData存在
+          if (!value.lrcAMData || value.lrcAMData.length === 0) {
+            if (value.yrcAMData && value.yrcAMData.length > 0) {
+              // 如果有yrcAMData但没有lrcAMData，使用yrcAMData作为备用
+              console.log("使用yrcAMData作为lrcAMData的备用");
+              value.lrcAMData = [...value.yrcAMData];
+            } else {
+              // 创建基本的lrcAMData
+              console.log("创建基本的lrcAMData数组");
+              value.lrcAMData = value.lrc.map(line => ({
+                startTime: line.time * 1000,
+                endTime: (line.time + 5) * 1000, // 假设每行持续5秒
+                words: [{
+                  word: line.content,
+                  startTime: line.time * 1000,
+                  endTime: (line.time + 5) * 1000
+                }],
+                translatedLyric: "",
+                romanLyric: "",
+                isBG: false,
+                isDuet: false
+              }));
+            }
+          }
+          
+          // 确保TTML相关字段存在
+          if (value.hasTTML === undefined) {
+            value.hasTTML = false;
+          }
+          if (value.ttml === undefined) {
+            value.ttml = [];
+          }
+          
+          this.songLyric = value;
+          console.log("歌词数据已存储到store:", this.songLyric);
         } catch (err) {
           $message.error(getLanguageData("getLrcError"));
           console.error(getLanguageData("getLrcError"), err);
+          
+          // 即使出错，也确保有基本的歌词结构
+          this.songLyric = {
+            lrc: [
+              { time: 0, content: "加载歌词时出错" },
+              { time: 999, content: "Error loading lyrics" }
+            ],
+            yrc: [],
+            lrcAMData: [{
+              startTime: 0,
+              endTime: 5000,
+              words: [{
+                word: "加载歌词时出错",
+                startTime: 0,
+                endTime: 5000
+              }],
+              translatedLyric: "",
+              romanLyric: "",
+              isBG: false,
+              isDuet: false
+            }],
+            yrcAMData: [],
+            hasTTML: false,  // 出错时也设置TTML相关字段
+            ttml: [],
+            hasLrcTran: false,
+            hasLrcRoma: false,
+            hasYrc: false,
+            hasYrcTran: false,
+            hasYrcRoma: false,
+            formattedLrc: ""
+          };
         }
       } else {
         console.log("该歌曲暂无歌词");
@@ -322,11 +410,14 @@ const useMusicDataStore = defineStore("musicData", {
           yrc: [],
           lrcAMData: [],
           yrcAMData: [],
+          hasTTML: false,
+          ttml: [],
           hasLrcTran: false,
           hasLrcRoma: false,
           hasYrc: false,
           hasYrcTran: false,
-          hasYrcRoma: false
+          hasYrcRoma: false,
+          formattedLrc: ""
         };
       }
     },

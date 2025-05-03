@@ -182,7 +182,8 @@ import {
   checkMusicCanUse,
   getMusicUrl,
   getMusicNumUrl,
-  getMusicNewLyric,
+  getMusicDetail,
+  getUnifiedLyric,
 } from "@/api/song";
 import { NIcon } from "naive-ui";
 import {
@@ -221,6 +222,7 @@ import AllArtists from "@/components/DataList/AllArtists.vue";
 import BigPlayer from "./BigPlayer.vue";
 import "vue-slider-component/theme/default.css";
 import { watch } from "vue";
+import parseLyric, { formatToLrc } from "@/utils/parseLyric";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -308,13 +310,8 @@ const getPlaySongData = (data, level = setting.songLevel) => {
           music.setPlaySongIndex("next");
       });
     }
-    // 获取歌词 (可以在获取 URL 的同时进行)
-    getMusicNewLyric(id).then(res => {
-        console.log(`[Player] Lyric response for ${id}:`, res);
-        music.setPlaySongLyric(res);
-    }).catch(err => {
-        console.error(`[Player] Error fetching lyrics for ${id}:`, err);
-    });
+    // 获取歌词 (using the new unified function)
+    fetchAndParseLyric(id);
   } catch (err) {
     console.error("[Player] Error in getPlaySongData main block:", err);
     if (music.getPlaylists[0] && music.getPlayState) {
@@ -483,6 +480,32 @@ watch(
     });
   }
 );
+
+const fetchAndParseLyric = (id) => {
+  const useAtlas = setting.useLyricAtlasAPI;
+
+  getUnifiedLyric(id, useAtlas).then(lyricData => {
+    console.log(`[Player] Unified Lyric data received for ${id} (using Atlas: ${useAtlas}):`, lyricData);
+
+    const parsedResult = parseLyric(lyricData);
+    console.log(`[Player] Parsed lyric result for ${id}:`, parsedResult);
+
+    // 将解析后的歌词转换为标准LRC格式
+    const formattedLrc = formatToLrc(parsedResult);
+    console.log(`[Player] Formatted LRC for ${id}:`, formattedLrc);
+    
+    // 添加格式化后的LRC到结果中
+    parsedResult.formattedLrc = formattedLrc;
+
+    music.setPlaySongLyric(parsedResult);
+
+  }).catch(err => {
+    console.error(`[Player] Failed to get unified lyric for ${id}:`, err);
+    const defaultResult = parseLyric(null);
+    defaultResult.formattedLrc = ""; // 确保默认结果也有formattedLrc字段
+    music.setPlaySongLyric(defaultResult);
+  });
+};
 </script>
 
 <style lang="scss" scoped>
