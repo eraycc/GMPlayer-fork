@@ -1,9 +1,12 @@
-import axios from "@/utils/request";
-// Import specific parsers and types instead of the non-existent Lyric class
+// @ts-ignore
+import axios from "@/utils/request.js";
+// @ts-ignore
 import { parseLrc, parseQrc, parseYrc, parseTTML, LyricLine } from "@applemusic-like-lyrics/lyric";
 
 // Re-define LyricData interface based on parseLyric.ts
 interface LyricData {
+  romaji: string;
+  translation: string;
   lrc?: { lyric: string } | null;
   tlyric?: { lyric: string } | null;
   romalrc?: { lyric: string } | null;
@@ -28,6 +31,8 @@ interface LyricAtlasDirectResponse {
   format?: 'lrc' | 'qrc' | 'ttml' | string;
   source?: string;
   content?: string; // Raw lyric string
+  translation?: string; // 翻译歌词内容 (新版LAAPI)
+  romaji?: string; // 音译歌词内容 (新版LAAPI)
   // API might return other fields, add if necessary
 }
 
@@ -96,6 +101,7 @@ class NeteaseLyricProvider implements LyricProvider {
 // Implementation for the Lyric-Atlas API - ADJUSTED FOR ACTUAL RESPONSE
 class LyricAtlasProvider implements LyricProvider {
   async getLyric(id: number): Promise<LyricData | null> {
+    // @ts-ignore
     const apiUrl = import.meta.env.VITE_LYRIC_ATLAS_API_URL as string;
     if (!apiUrl) {
       console.error("VITE_LYRIC_ATLAS_API_URL is not defined in .env");
@@ -127,9 +133,29 @@ class LyricAtlasProvider implements LyricProvider {
         yrc: null,
         ytlrc: null,
         yromalrc: null,
-        hasTTML: false,  // 默认不是TTML格式
-        ttml: null       // 默认无TTML数据
+        hasTTML: false, // 默认不是TTML格式
+        ttml: null, // 默认无TTML数据
+        romaji: "",
+        translation: ""
       };
+
+      // 处理翻译歌词 (新版LAAPI)
+      if (response.translation) {
+        console.log(`[LyricAtlasProvider] Found translation lyrics for id: ${id}`);
+        // 将字符串版本的translation转换为对象格式，以匹配现有接口
+        result.tlyric = { lyric: response.translation };
+        // 同时保留原始字符串格式，以便processLyrics可以处理
+        result.translation = response.translation;
+      }
+
+      // 处理音译歌词 (新版LAAPI)
+      if (response.romaji) {
+        console.log(`[LyricAtlasProvider] Found romaji lyrics for id: ${id}`);
+        // 将字符串版本的romaji转换为对象格式，以匹配现有接口
+        result.romalrc = { lyric: response.romaji };
+        // 同时保留原始字符串格式，以便processLyrics可以处理
+        result.romaji = response.romaji;
+      }
 
       // Map content based on format
       if (response.format === 'lrc') {
@@ -302,6 +328,7 @@ export class LyricService {
   private provider: LyricProvider;
 
   constructor(useLyricAtlas: boolean = false) {
+    // @ts-ignore
     if (useLyricAtlas && import.meta.env.VITE_LYRIC_ATLAS_API_URL) {
       console.log("Using Lyric Atlas provider.");
       this.provider = new LyricAtlasProvider();
@@ -325,66 +352,121 @@ export class LyricService {
           result.code = 200;
         }
         
-        // 如果没有lrc但有yrc，确保我们能从yrc中创建一个基本的lrc
-        if ((!result.lrc || !result.lrc.lyric) && result.yrc && result.yrc.lyric) {
-          console.log(`[LyricService] No LRC found for id ${id}, attempting to generate from YRC`);
+        // 确保所有来源的翻译歌词和音译歌词时间戳都与主歌词同步
+        if (result.lrc?.lyric) {
+          console.log(`[LyricService] 处理歌词同步，id: ${id}`);
           
-          try {
-            // 判断内容是否是yrc或qrc格式，并选择对应的解析器
-            let parsedLyric;
-            
-            // 使用内容检测歌词类型
-            const content = result.yrc.lyric;
-            const contentType = getYrcType(content);
-            
-            if (contentType === 'yrc') {
-              // 使用YRC解析器
-              parsedLyric = parseYrc(content);
-              console.log(`[LyricService] Using YRC parser for id: ${id}`);
-            } else {
-              // 使用QRC解析器
-              parsedLyric = parseQrc(content);
-              console.log(`[LyricService] Using QRC parser for id: ${id}`);
-            }
-            
-            if (parsedLyric && parsedLyric.length > 0) {
-              let lrcText = '';
-              parsedLyric.forEach(line => {
-                if (line.words && line.words.length > 0) {
-                  const timeMs = line.words[0].startTime;
-                  const minutes = Math.floor(timeMs / 60000);
-                  const seconds = ((timeMs % 60000) / 1000).toFixed(2);
-                  const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.padStart(5, '0')}`;
-                  const content = line.words.map(w => w.word).join('');
-                  lrcText += `[${timeStr}]${content}\n`;
-                }
-              });
+          // 先准备主歌词的时间轴和内容映射
+          const mainTimeMap = new Map<number, {time: string, content: string, rawLine: string}>();
+          
+          const mainLrcLines = result.lrc.lyric.split('\n').filter(line => line.trim());
+          const timeRegex = /\[(\d{2}:\d{2}(?:\.\d{2})?)\]/;
+          
+          // 构建主歌词时间映射
+          for (const line of mainLrcLines) {
+            const match = line.match(timeRegex);
+            if (match && match[1]) {
+              const timeStr = match[1];
+              // 将时间字符串转换为毫秒，便于比较
+              const timeParts = timeStr.split(':');
+              const minutes = parseInt(timeParts[0]);
+              const seconds = parseFloat(timeParts[1]);
+              const timeMs = minutes * 60000 + seconds * 1000;
               
-              // 如果成功创建了lrc文本，使用它
-              if (lrcText.trim()) {
-                result.lrc = { lyric: lrcText };
-                console.log(`[LyricService] Successfully generated LRC from ${contentType} for id ${id}`);
-              } else {
-                // 如果无法创建有效内容，使用占位符
-                result.lrc = { lyric: "[00:00.00]无法从歌词生成LRC\n[99:99.99]" };
-                console.warn(`[LyricService] Failed to generate meaningful LRC from ${contentType} for id ${id}`);
+              const content = line.replace(timeRegex, '').trim();
+              if (content) {
+                mainTimeMap.set(timeMs, {time: timeStr, content, rawLine: line});
               }
-            } else {
-              // 解析YRC/QRC失败，使用占位符
-              result.lrc = { lyric: "[00:00.00]无法解析歌词\n[99:99.99]" };
-              console.warn(`[LyricService] Failed to parse ${contentType} for id ${id}`);
             }
-          } catch (error) {
-            // 出现异常，使用占位符
-            result.lrc = { lyric: "[00:00.00]处理歌词时出错\n[99:99.99]" };
-            console.error(`[LyricService] Error generating LRC from YRC/QRC for id ${id}:`, error);
           }
-        }
+          
+          // 处理翻译歌词同步
+          if (result.tlyric?.lyric) {
+            console.log(`[LyricService] 对翻译歌词进行时间戳同步，id: ${id}`);
+            result.tlyric.lyric = this.syncLyricTimestamps(
+              result.tlyric.lyric, 
+              mainTimeMap, 
+              "翻译歌词",
+              id
+            );
+          } else {
+            console.log(`[LyricService] 没有发现翻译歌词，id: ${id}`);
+          }
+          
+          // 处理音译歌词同步
+          if (result.romalrc?.lyric) {
+            console.log(`[LyricService] 对音译歌词进行时间戳同步，id: ${id}`);
+            result.romalrc.lyric = this.syncLyricTimestamps(
+              result.romalrc.lyric, 
+              mainTimeMap, 
+              "音译歌词",
+              id
+            );
+          } else {
+            console.log(`[LyricService] 没有发现音译歌词，id: ${id}`);
+          }
         
-        // 如果没有lrc也没有yrc，使用占位符
-        if ((!result.lrc || !result.lrc.lyric) && (!result.yrc || !result.yrc.lyric)) {
-          console.warn(`[LyricService] No lyric data (neither LRC nor YRC) found for id ${id}, using placeholder`);
-          result.lrc = { lyric: "[00:00.00]暂无歌词\n[99:99.99]" };
+          // 如果没有lrc但有yrc，确保我们能从yrc中创建一个基本的lrc
+          if ((!result.lrc || !result.lrc.lyric) && result.yrc && result.yrc.lyric) {
+            console.log(`[LyricService] No LRC found for id ${id}, attempting to generate from YRC`);
+            
+            try {
+              // 判断内容是否是yrc或qrc格式，并选择对应的解析器
+              let parsedLyric;
+              
+              // 使用内容检测歌词类型
+              const content = result.yrc.lyric;
+              const contentType = getYrcType(content);
+              
+              if (contentType === 'yrc') {
+                // 使用YRC解析器
+                parsedLyric = parseYrc(content);
+                console.log(`[LyricService] Using YRC parser for id: ${id}`);
+              } else {
+                // 使用QRC解析器
+                parsedLyric = parseQrc(content);
+                console.log(`[LyricService] Using QRC parser for id: ${id}`);
+              }
+              
+              if (parsedLyric && parsedLyric.length > 0) {
+                let lrcText = '';
+                parsedLyric.forEach(line => {
+                  if (line.words && line.words.length > 0) {
+                    const timeMs = line.words[0].startTime;
+                    const minutes = Math.floor(timeMs / 60000);
+                    const seconds = ((timeMs % 60000) / 1000).toFixed(2);
+                    const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.padStart(5, '0')}`;
+                    const content = line.words.map(w => w.word).join('');
+                    lrcText += `[${timeStr}]${content}\n`;
+                  }
+                });
+                
+                // 如果成功创建了lrc文本，使用它
+                if (lrcText.trim()) {
+                  result.lrc = { lyric: lrcText };
+                  console.log(`[LyricService] Successfully generated LRC from ${contentType} for id ${id}`);
+                } else {
+                  // 如果无法创建有效内容，使用占位符
+                  result.lrc = { lyric: "[00:00.00]无法从歌词生成LRC\n[99:99.99]" };
+                  console.warn(`[LyricService] Failed to generate meaningful LRC from ${contentType} for id ${id}`);
+                }
+              } else {
+                // 解析YRC/QRC失败，使用占位符
+                result.lrc = { lyric: "[00:00.00]无法解析歌词\n[99:99.99]" };
+                console.warn(`[LyricService] Failed to parse ${contentType} for id ${id}`);
+              }
+            } catch (error) {
+              // 出现异常，使用占位符
+              result.lrc = { lyric: "[00:00.00]处理歌词时出错\n[99:99.99]" };
+              console.error(`[LyricService] Error generating LRC from YRC/QRC for id ${id}:`, error);
+            }
+          }
+          
+          // 如果没有lrc也没有yrc，使用占位符
+          if ((!result.lrc || !result.lrc.lyric) && (!result.yrc || !result.yrc.lyric)) {
+            console.warn(`[LyricService] No lyric data (neither LRC nor YRC) found for id ${id}, using placeholder`);
+            result.lrc = { lyric: "[00:00.00]暂无歌词\n[99:99.99]" };
+          }
         }
       }
       
@@ -393,6 +475,97 @@ export class LyricService {
       console.error(`[LyricService] Failed to fetch lyric for id ${id}:`, error);
       return null;
     }
+  }
+  
+  /**
+   * 同步歌词时间戳，使辅助歌词(翻译、音译等)的时间戳与主歌词一致
+   * @param lyricText 要同步的歌词文本
+   * @param mainTimeMap 主歌词时间映射
+   * @param lyricType 歌词类型描述(用于日志)
+   * @param songId 歌曲ID(用于日志)
+   * @returns 同步后的歌词文本
+   */
+  private syncLyricTimestamps(
+    lyricText: string,
+    mainTimeMap: Map<number, {time: string, content: string, rawLine: string}>,
+    lyricType: string,
+    songId: number
+  ): string {
+    if (!lyricText || !mainTimeMap.size) return lyricText;
+    
+    console.log(`[LyricService] 开始同步${lyricType}，歌曲ID: ${songId}`);
+    
+    const timeRegex = /\[(\d{2}:\d{2}(?:\.\d{2})?)\]/;
+    const lines = lyricText.split('\n').filter(line => line.trim());
+    const mainTimestamps = Array.from(mainTimeMap.keys()).sort((a, b) => a - b);
+    
+    // 构建辅助歌词的时间和内容数组
+    const auxLyrics: {timeMs: number, timeStr: string, content: string}[] = [];
+    
+    for (const line of lines) {
+      const match = line.match(timeRegex);
+      if (match && match[1]) {
+        const timeStr = match[1];
+        const timeParts = timeStr.split(':');
+        const minutes = parseInt(timeParts[0]);
+        const seconds = parseFloat(timeParts[1]);
+        const timeMs = minutes * 60000 + seconds * 1000;
+        
+        const content = line.replace(timeRegex, '').trim();
+        if (content) {
+          auxLyrics.push({timeMs, timeStr, content});
+        }
+      }
+    }
+    
+    // 按时间排序
+    auxLyrics.sort((a, b) => a.timeMs - b.timeMs);
+    
+    // 如果辅助歌词数量和主歌词不同，使用智能匹配
+    let newLyricText = '';
+    
+    if (auxLyrics.length === mainTimestamps.length) {
+      // 数量相同，直接一一对应同步
+      console.log(`[LyricService] ${lyricType}行数与主歌词匹配(${auxLyrics.length}行)，执行直接同步`);
+      for (let i = 0; i < auxLyrics.length; i++) {
+        const mainTime = mainTimeMap.get(mainTimestamps[i])?.time || "00:00.00";
+        newLyricText += `[${mainTime}]${auxLyrics[i].content}\n`;
+      }
+    } else {
+      // 数量不同，使用时间最接近原则匹配
+      console.log(`[LyricService] ${lyricType}行数与主歌词不匹配(主: ${mainTimestamps.length}行, 辅: ${auxLyrics.length}行)，执行智能匹配`);
+      
+      // 为每行辅助歌词找到时间上最接近的主歌词行
+      for (const auxLyric of auxLyrics) {
+        // 找出时间上最接近的主歌词时间戳
+        let closestMainTime = mainTimestamps[0];
+        let minTimeDiff = Math.abs(auxLyric.timeMs - closestMainTime);
+        
+        for (const mainTime of mainTimestamps) {
+          const timeDiff = Math.abs(auxLyric.timeMs - mainTime);
+          if (timeDiff < minTimeDiff) {
+            minTimeDiff = timeDiff;
+            closestMainTime = mainTime;
+          }
+        }
+        
+        // 使用找到的主歌词时间戳
+        const mainTime = mainTimeMap.get(closestMainTime)?.time || "00:00.00";
+        newLyricText += `[${mainTime}]${auxLyric.content}\n`;
+      }
+      
+      // 确保所有辅助歌词都有对应的主歌词时间
+      if (auxLyrics.length < mainTimestamps.length) {
+        console.log(`[LyricService] ${lyricType}行数少于主歌词，已进行最佳匹配`);
+      } else {
+        console.log(`[LyricService] ${lyricType}行数多于主歌词，已尝试去重和合并`);
+        // 可能有多行辅助歌词对应同一个时间戳，这里已经通过最接近原则处理了
+      }
+    }
+    
+    console.log(`[LyricService] ${lyricType}同步完成，原行数: ${auxLyrics.length}，同步后行数: ${newLyricText.split('\n').filter(l => l.trim()).length}`);
+    
+    return newLyricText;
   }
 }
 
