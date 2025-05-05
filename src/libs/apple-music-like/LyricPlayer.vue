@@ -20,10 +20,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { musicStore, settingStore, siteStore } from "../../store";
 import { LyricPlayer, type LyricPlayerRef } from "@applemusic-like-lyrics/vue";
-import { createLyricsProcessor, type LyricLine } from "./processLyrics";
+import { preprocessLyrics, getProcessedLyrics, type LyricLine } from "./processLyrics";
 
 const lyricPlayerRef = ref<LyricPlayerRef>();
 const site = siteStore();
@@ -85,29 +85,56 @@ const mainColor = computed(() => {
   return `rgb(${site.songPicColor})`;
 });
 
-// 获取当前歌词
+// 在组件挂载时预处理歌词，提前缓存结果
+onMounted(() => {
+  // 如果有歌词数据，预处理并缓存结果
+  if (music.songLyric) {
+    console.log("[LyricPlayer] 组件挂载时预处理歌词数据");
+    try {
+      preprocessLyrics(music.songLyric, { 
+        showYrc: setting.showYrc,
+        showRoma: setting.showRoma,
+        showTransl: setting.showTransl
+      });
+    } catch (error) {
+      console.error("[LyricPlayer] 预处理歌词失败", error);
+    }
+  }
+});
+
+// 获取当前歌词 - 优先使用预处理缓存
 const currentLyrics = computed<LyricLine[]>(() => {
   const songLyric = music.songLyric || { lrcAMData: [], yrcAMData: [], hasTTML: false, ttml: [] };
   
   // 记录歌词数据来源信息
-  if (songLyric.hasTTML && songLyric.ttml && songLyric.ttml.length > 0) {
-    console.log("[LyricPlayer] 检测到TTML格式歌词数据，行数:", songLyric.ttml.length);
-  } else if (setting.showYrc && songLyric.yrcAMData?.length) {
-    console.log("[LyricPlayer] 使用YRC格式歌词数据，行数:", songLyric.yrcAMData.length);
-  } else if (songLyric.lrcAMData?.length) {
-    console.log("[LyricPlayer] 使用LRC格式歌词数据，行数:", songLyric.lrcAMData.length);
-  } else {
+  if (!songLyric.lrcAMData?.length && !songLyric.yrcAMData?.length && !songLyric.ttml?.length) {
     console.log("[LyricPlayer] 未检测到有效歌词数据");
+    return [];
   }
   
-  const lyricData = createLyricsProcessor(songLyric, { 
+  // 使用优化后的函数获取歌词，优先使用缓存数据
+  return getProcessedLyrics(songLyric, { 
     showYrc: setting.showYrc,
     showRoma: setting.showRoma,
     showTransl: setting.showTransl
   });
-  
-  return lyricData;
 });
+
+// 监听歌曲变化时预处理歌词
+watch(() => music.songLyric, (newLyric) => {
+  if (newLyric) {
+    console.log("[LyricPlayer] 歌词数据变化，预处理新的歌词");
+    try {
+      preprocessLyrics(newLyric, { 
+        showYrc: setting.showYrc,
+        showRoma: setting.showRoma,
+        showTransl: setting.showTransl
+      });
+    } catch (error) {
+      console.error("[LyricPlayer] 预处理新歌词失败", error);
+    }
+  }
+}, { deep: true });
 
 watch(() => music.playState, (newState) => {
   if (newState) {

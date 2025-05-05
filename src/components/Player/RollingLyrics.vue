@@ -11,7 +11,7 @@
 import { computed } from 'vue';
 import { musicStore, settingStore } from "../../store";
 import LyricPlayer from "../../libs/apple-music-like/LyricPlayer.vue";
-import { createLyricsProcessor } from "../../libs/apple-music-like/processLyrics";
+import { getProcessedLyrics } from "../../libs/apple-music-like/processLyrics";
 
 const emit = defineEmits<{
   lrcTextClick: [time: number]
@@ -41,14 +41,17 @@ const lyricClasses = computed(() => ({
   'loading': music.isLoadingSong
 }));
 
-// 获取当前歌词
+// 获取当前歌词 - 使用优化后的函数获取歌词数据
 const currentLyrics = computed(() => {
   const songLyric = music.songLyric || { lrcAMData: [], yrcAMData: [] };
-  return createLyricsProcessor(songLyric, {
+  // 使用优化后的处理函数，利用缓存提高性能
+  const processedLyrics = getProcessedLyrics(songLyric, {
     showYrc: setting.showYrc,
     showRoma: setting.showRoma,
     showTransl: setting.showTransl
-  })[0];
+  });
+  
+  return processedLyrics && processedLyrics.length > 0 ? processedLyrics[0] : null;
 });
 </script>
 

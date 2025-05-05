@@ -10,6 +10,7 @@ import { PlayCycle, PlayOnce, ShuffleOne } from "@icon-park/vue-next";
 import { soundStop, fadePlayOrPause } from "@/utils/Player";
 import { parseLyric } from "@/utils/parseLyric";
 import getLanguageData from "@/utils/getLanguageData";
+import { preprocessLyrics } from "@/libs/apple-music-like/processLyrics";
 
 const useMusicDataStore = defineStore("musicData", {
   state: () => {
@@ -365,6 +366,22 @@ const useMusicDataStore = defineStore("musicData", {
           if (value.ttml === undefined) {
             value.ttml = [];
           }
+          
+          // 在存入状态前预处理歌词数据，提高性能
+          console.time('预处理歌词');
+          const settings = settingStore();
+          try {
+            // 预处理并缓存处理后的结果
+            preprocessLyrics(value, {
+              showYrc: settings.showYrc,
+              showRoma: settings.showRoma,
+              showTransl: settings.showTransl
+            });
+            console.log("歌词数据预处理完成");
+          } catch (err) {
+            console.warn("歌词预处理出错，将使用原始数据:", err);
+          }
+          console.timeEnd('预处理歌词');
           
           this.songLyric = value;
           console.log("歌词数据已存储到store:", this.songLyric);
