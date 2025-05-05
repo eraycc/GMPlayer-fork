@@ -2,6 +2,7 @@
 import axios from "@/utils/request.js";
 // @ts-ignore
 import { parseLrc, parseQrc, parseYrc, parseTTML, LyricLine } from "@applemusic-like-lyrics/lyric";
+import { preprocessLyrics } from "@/libs/apple-music-like/processLyrics";
 
 // Re-define LyricData interface based on parseLyric.ts
 interface LyricData {
@@ -17,6 +18,8 @@ interface LyricData {
   // 添加TTML相关字段，用于传递TTML数据
   hasTTML?: boolean;
   ttml?: any;
+  // 添加处理后的缓存字段
+  processedLyrics?: any;
 }
 
 // Interface for the raw response from Netease /lyric endpoint (assumed structure)
@@ -34,6 +37,13 @@ interface LyricAtlasDirectResponse {
   translation?: string; // 翻译歌词内容 (新版LAAPI)
   romaji?: string; // 音译歌词内容 (新版LAAPI)
   // API might return other fields, add if necessary
+}
+
+// 设置选项接口
+interface LyricProcessOptions {
+  showYrc: boolean;
+  showRoma: boolean;
+  showTransl: boolean;
 }
 
 // TTML格式歌词的接口声明
@@ -326,6 +336,11 @@ class LyricAtlasProvider implements LyricProvider {
 // Lyric Service Factory - fetchLyric now returns Promise<LyricData | null>
 export class LyricService {
   private provider: LyricProvider;
+  private defaultProcessOptions: LyricProcessOptions = {
+    showYrc: true,
+    showRoma: false,
+    showTransl: false
+  };
 
   constructor(useLyricAtlas: boolean = false) {
     // @ts-ignore
@@ -341,8 +356,24 @@ export class LyricService {
     }
   }
 
-  async fetchLyric(id: number): Promise<LyricData | null> {
+  /**
+   * 设置默认的歌词处理选项
+   * @param options 歌词处理选项
+   */
+  setDefaultProcessOptions(options: LyricProcessOptions): void {
+    this.defaultProcessOptions = { ...this.defaultProcessOptions, ...options };
+  }
+
+  /**
+   * 获取歌词并进行处理
+   * @param id 歌曲ID
+   * @param processOptions 歌词处理选项，可选，不提供则使用默认选项
+   */
+  async fetchLyric(id: number, processOptions?: LyricProcessOptions): Promise<LyricData | null> {
     try {
+      const startTime = performance.now();
+      console.time(`[LyricService] 获取并处理歌词 ${id}`);
+      
       const result = await this.provider.getLyric(id);
       
       // 检查并确保结果始终包含lrc格式的歌词
@@ -468,7 +499,25 @@ export class LyricService {
             result.lrc = { lyric: "[00:00.00]暂无歌词\n[99:99.99]" };
           }
         }
+        
+        // 设置歌词处理选项，优先使用传入的选项，否则使用默认选项
+        const options = processOptions || this.defaultProcessOptions;
+        
+        // 预处理歌词数据，提前生成缓存以提高性能
+        console.time('[LyricService] 预处理歌词');
+        try {
+          // 这里我们调用改进后的预处理函数，将处理结果缓存到歌词对象中
+          preprocessLyrics(result, options);
+          console.log(`[LyricService] 歌曲ID ${id} 歌词预处理成功`);
+        } catch (err) {
+          console.warn(`[LyricService] 歌曲ID ${id} 歌词预处理失败:`, err);
+        }
+        console.timeEnd('[LyricService] 预处理歌词');
       }
+      
+      const endTime = performance.now();
+      console.timeEnd(`[LyricService] 获取并处理歌词 ${id}`);
+      console.log(`[LyricService] 歌词处理总耗时: ${(endTime - startTime).toFixed(2)}ms`);
       
       return result;
     } catch (error) {
