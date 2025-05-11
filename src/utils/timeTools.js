@@ -1,5 +1,10 @@
 import getLanguageData from "./getLanguageData";
 import { format } from 'date-fns';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
+
+// 初始化dayjs的duration插件
+dayjs.extend(duration);
 
 export const msToS = (milliseconds, decimalPlaces = 2)=> {
   return Number((milliseconds / 1000).toFixed(decimalPlaces));

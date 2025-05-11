@@ -32,6 +32,17 @@ export interface LyricData {
 }
 
 /**
+ * 歌词元数据接口
+ */
+export interface LyricMeta {
+  found: boolean;
+  id: string;
+  availableFormats?: string[]; // 如 ["yrc", "eslrc", "lrc", "ttml"]
+  hasTranslation?: boolean;
+  hasRomaji?: boolean;
+}
+
+/**
  * 歌曲歌词接口
  */
 export interface SongLyric {
@@ -48,6 +59,8 @@ export interface SongLyric {
   processedLyrics?: LyricLine[];
   // 处理设置的哈希值，用于检测设置是否变更
   settingsHash?: string;
+  // 添加元数据信息
+  meta?: LyricMeta;
 }
 
 /**
@@ -180,6 +193,18 @@ export function createLyricsProcessor(songLyric: SongLyric, settings: SettingSta
   let translationMap: Map<number, string> = new Map();
   let romajiMap: Map<number, string> = new Map();
   
+  // 检查是否有元数据
+  const hasMetaInfo = songLyric.meta?.found;
+  const canUseAdvancedTranslation = hasMetaInfo && 
+                                   (songLyric.meta?.hasTranslation || 
+                                    (songLyric.meta?.availableFormats?.includes('eslrc') || 
+                                     songLyric.meta?.availableFormats?.includes('yrc')));
+  
+  const canUseAdvancedRomaji = hasMetaInfo && 
+                              (songLyric.meta?.hasRomaji || 
+                               (songLyric.meta?.availableFormats?.includes('eslrc') || 
+                                songLyric.meta?.availableFormats?.includes('yrc')));
+
   // 提前解析翻译和音译数据到映射表，只解析一次
   if (settings.showTransl) {
     // 处理不同格式的翻译歌词
@@ -231,57 +256,110 @@ export function createLyricsProcessor(songLyric: SongLyric, settings: SettingSta
     }
   }
 
+  // 对于YRC/ESLRC/TTML等非LRC格式，处理翻译和音译的特殊逻辑
+  let specialProcessingNeeded = false;
+  if (songLyric.hasTTML || (settings.showYrc && songLyric.yrcAMData?.length)) {
+    // 检查是否有元数据，以及是否可以使用高级翻译/音译功能
+    if ((hasMetaInfo && (canUseAdvancedTranslation || canUseAdvancedRomaji)) ||
+        (songLyric.meta?.availableFormats && 
+         (songLyric.meta?.availableFormats.includes('yrc') || 
+          songLyric.meta?.availableFormats.includes('eslrc') ||
+          songLyric.meta?.availableFormats.includes('ttml')))) {
+      specialProcessingNeeded = true;
+      console.log('[createLyricsProcessor] 启用非LRC格式翻译/音译处理');
+    }
+  }
+
+  // 预填充翻译和音译映射到每一行歌词，解决非LRC格式歌词的翻译问题
+  if (specialProcessingNeeded && rawLyrics.length > 0) {
+    console.log(`[createLyricsProcessor] 非LRC格式歌词，预填充翻译和音译，行数: ${rawLyrics.length}`);
+    
+    // 1. 获取所有行的开始时间
+    const lineStartTimes = rawLyrics.map(line => {
+      const rawLine = toRaw(line);
+      return rawLine.startTime || (rawLine.words && rawLine.words.length > 0 ? rawLine.words[0].startTime : 0);
+    }).filter(time => time > 0);
+    
+    // 2. 如果有翻译，预先计算每行的翻译
+    const lineTranslations: string[] = [];
+    if (settings.showTransl && translationMap.size > 0) {
+      for (const startTime of lineStartTimes) {
+        lineTranslations.push(findBestTimeMatch(startTime, translationMap));
+      }
+      console.log(`[createLyricsProcessor] 预填充翻译映射完成，共${lineTranslations.length}行`);
+    }
+    
+    // 3. 如果有音译，预先计算每行的音译
+    const lineRomajis: string[] = [];
+    if (settings.showRoma && romajiMap.size > 0) {
+      for (const startTime of lineStartTimes) {
+        lineRomajis.push(findBestTimeMatch(startTime, romajiMap));
+      }
+      console.log(`[createLyricsProcessor] 预填充音译映射完成，共${lineRomajis.length}行`);
+    }
+    
+    // 4. 直接填充翻译和音译到原始歌词行
+    if (lineTranslations.length > 0 || lineRomajis.length > 0) {
+      rawLyrics = rawLyrics.map((line, index) => {
+        const rawLine = toRaw(line);
+        
+        // 如果行索引有效且有预填充的翻译，添加翻译
+        if (settings.showTransl && index < lineTranslations.length && lineTranslations[index]) {
+          rawLine.translatedLyric = lineTranslations[index];
+        }
+        
+        // 如果行索引有效且有预填充的音译，添加音译
+        if (settings.showRoma && index < lineRomajis.length && lineRomajis[index]) {
+          rawLine.romanLyric = lineRomajis[index];
+        }
+        
+        return rawLine;
+      });
+      
+      console.log(`[createLyricsProcessor] 预填充完成，处理后行数: ${rawLyrics.length}`);
+    }
+  }
+
   // 优化批量处理 - 减少循环和条件判断
   return rawLyrics.map((line: LyricLine, lineIndex: number) => {
     const rawLine = toRaw(line);
     
     // 处理单词间的空格逻辑
     const processedWords = processWords(rawLine.words || []);
-    
+      
     // 获取当前行的开始时间，用于匹配翻译/音译
     const currentStartTime = rawLine.startTime || (processedWords.length > 0 ? processedWords[0].startTime : 0);
     
     // 初始化翻译和音译文本
     let translatedLyric = "";
     let romanLyric = "";
-    
-    // 高效查找翻译
-    if (settings.showTransl && translationMap.size > 0) {
-      translatedLyric = findBestTimeMatch(currentStartTime, translationMap);
-    }
-    
-    // 高效查找音译
-    if (settings.showRoma && romajiMap.size > 0) {
-      romanLyric = findBestTimeMatch(currentStartTime, romajiMap);
-    }
-    
-    // 如果从LAAPI获取不到，再使用现有的翻译和音译
-    if (!translatedLyric && rawLine.translatedLyric) {
+
+    // 对于特殊处理的格式，先检查原始行是否已包含翻译/音译
+    if (rawLine.translatedLyric) {
       translatedLyric = rawLine.translatedLyric;
     }
     
-    if (!romanLyric && rawLine.romanLyric) {
+    if (rawLine.romanLyric) {
       romanLyric = rawLine.romanLyric;
     }
-    
-    // 确保歌词行有有效的开始和结束时间
-    let startTime = rawLine.startTime;
-    let endTime = rawLine.endTime;
-    
-    if (processedWords.length > 0) {
-      startTime = startTime || processedWords[0].startTime || 0;
-      endTime = endTime || processedWords[processedWords.length - 1].endTime || (startTime + 5000);
+
+    // 如果行本身没有翻译/音译，再尝试从映射中查找
+    // 高效查找翻译
+    if (settings.showTransl && !translatedLyric && translationMap.size > 0) {
+      translatedLyric = findBestTimeMatch(currentStartTime, translationMap);
     }
-    
-    // 返回处理后的歌词行对象
+
+    // 高效查找音译
+    if (settings.showRoma && !romanLyric && romajiMap.size > 0) {
+      romanLyric = findBestTimeMatch(currentStartTime, romajiMap);
+    }
+
+    // 创建处理后的行对象并返回
     return {
-      startTime: startTime || 0,
-      endTime: endTime || 0,
+      ...rawLine,
       words: processedWords,
-      translatedLyric: translatedLyric,
-      romanLyric: romanLyric,
-      isBG: rawLine.isBG || false,
-      isDuet: rawLine.isDuet || false
+      translatedLyric,
+      romanLyric
     };
   });
 }
@@ -292,60 +370,60 @@ export function createLyricsProcessor(songLyric: SongLyric, settings: SettingSta
  * @returns 处理后的单词数组
  */
 function processWords(words: LyricWord[]): LyricWord[] {
-  // 定义特殊字符集合，这些字符前后不应添加空格
-  const specialChars = new Set(["'", "'", "'", "-", "…", ".", "'", "?", "'"]);
+    // 定义特殊字符集合，这些字符前后不应添加空格
+    const specialChars = new Set(["'", "'", "'", "-", "…", ".", "'", "?", "'"]);
   
   // 用于检测中文字符的正则表达式，预编译提高效率
   const chineseRegex = /[\u4e00-\u9fa5]/;
-  
-  // 检测是否包含中文字符的函数
-  const containsChinese = (text: string): boolean => {
+    
+    // 检测是否包含中文字符的函数
+    const containsChinese = (text: string): boolean => {
     return chineseRegex.test(text);
-  };
+    };
 
-  // 检查字符串是否以特殊字符开头或结尾
-  const hasSpecialCharAtBoundary = (text: string): boolean => {
-    if (!text || text.length === 0) return false;
-    const firstChar = text.charAt(0);
-    const lastChar = text.charAt(text.length - 1);
-    return specialChars.has(firstChar) || specialChars.has(lastChar);
-  };
-  
+    // 检查字符串是否以特殊字符开头或结尾
+    const hasSpecialCharAtBoundary = (text: string): boolean => {
+      if (!text || text.length === 0) return false;
+      const firstChar = text.charAt(0);
+      const lastChar = text.charAt(text.length - 1);
+      return specialChars.has(firstChar) || specialChars.has(lastChar);
+    };
+    
   // 优化单词处理循环，减少重复计算
   return toRaw(words).reduce<LyricWord[]>((acc, word, index, array) => {
-    if (!word) return acc;
-    
+      if (!word) return acc;
+      
     const currentWord = word.word?.trim() || "";
     
     // 添加当前单词
-    acc.push({
-      startTime: word.startTime,
-      endTime: word.endTime,
+      acc.push({
+        startTime: word.startTime,
+        endTime: word.endTime,
       word: currentWord
-    });
-    
-    // 如果不是最后一个单词，考虑添加空格
-    if (index < array.length - 1 && array[index + 1]) {
-      const nextWord = array[index + 1].word?.trim() || "";
+      });
       
+      // 如果不是最后一个单词，考虑添加空格
+      if (index < array.length - 1 && array[index + 1]) {
+        const nextWord = array[index + 1].word?.trim() || "";
+        
       // 使用短路逻辑减少计算量
-      if (currentWord && nextWord &&
-          !specialChars.has(currentWord) && 
-          !specialChars.has(nextWord) && 
-          !hasSpecialCharAtBoundary(currentWord) && 
-          !hasSpecialCharAtBoundary(nextWord) &&
-          !containsChinese(currentWord) && 
-          !containsChinese(nextWord)) {
-        acc.push({
+        if (currentWord && nextWord &&
+            !specialChars.has(currentWord) && 
+            !specialChars.has(nextWord) && 
+            !hasSpecialCharAtBoundary(currentWord) && 
+            !hasSpecialCharAtBoundary(nextWord) &&
+            !containsChinese(currentWord) && 
+            !containsChinese(nextWord)) {
+          acc.push({
           word: "\u00A0", // 不间断空格
-          startTime: 0,
-          endTime: 0
-        });
+            startTime: 0,
+            endTime: 0
+          });
+        }
       }
-    }
-    
-    return acc;
-  }, []);
+      
+      return acc;
+    }, []);
 }
 
 /**

@@ -82,6 +82,25 @@ export const getUnifiedLyric = async (id, useLyricAtlas = false) => {
 };
 
 /**
+ * 检查指定音乐的歌词元数据
+ * @param {number} id - 要检查的音乐ID
+ * @param {boolean} [useLyricAtlas=true] - 是否使用 Lyric Atlas API。默认为 true，因为目前只有LAAPI支持此功能。
+ * @returns {Promise<object|null>} 返回歌词元数据对象或null
+ */
+export const checkLyricMeta = async (id, useLyricAtlas = true) => {
+  // 元数据检查需要Lyric Atlas API，所以默认使用
+  const lyricService = new LyricService(useLyricAtlas);
+  try {
+    // 如果服务不支持元数据检查，会返回null
+    const metaData = await lyricService.checkLyricMeta(id);
+    return metaData;
+  } catch (error) {
+    console.error(`Failed to check lyric meta for id ${id}:`, error);
+    return null;
+  }
+};
+
+/**
  * 获取指定音乐的详情。
  * @param {string} ids - 要获取详情的音乐ID，多个ID用逗号分隔
  */

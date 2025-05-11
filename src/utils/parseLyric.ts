@@ -172,24 +172,51 @@ const parseLyric = (data: LyricData | null): ParsedLyricResult => {
 
     // Parse normal lyrics
     if (lrcData.lrc) {
-      const lrcParsed = parseCoreLrc(lrcData.lrc);
-      result.lrc = parseLrcData(lrcParsed);
+      try {
+        console.log("[parseLyric] 开始解析LRC歌词");
+        // 对 LRC 文本进行预处理
+        let lrcText = lrcData.lrc;
+        // 移除可能存在的反斜杠转义字符
+        lrcText = lrcText.replace(/\\n/g, '\n');
+        // 解析歌词
+        const lrcParsed = parseCoreLrc(lrcText);
+        console.log(`[parseLyric] 解析LRC完成，共 ${lrcParsed.length} 行`);
+        result.lrc = parseLrcData(lrcParsed);
 
-      // Parse translations if they exist
-      let tranParsed: LyricLine[] = [];
-      let romaParsed: LyricLine[] = [];
+        // Parse translations if they exist
+        let tranParsed: LyricLine[] = [];
+        let romaParsed: LyricLine[] = [];
 
-      if (lrcData.tlyric) {
-        tranParsed = parseCoreLrc(lrcData.tlyric);
-        result.lrc = alignLyrics(result.lrc, parseLrcData(tranParsed), "tran");
+        if (lrcData.tlyric) {
+          console.log("[parseLyric] 开始解析翻译歌词");
+          // 预处理翻译歌词
+          let tlyricText = lrcData.tlyric;
+          tlyricText = tlyricText.replace(/\\n/g, '\n');
+          tranParsed = parseCoreLrc(tlyricText);
+          console.log(`[parseLyric] 解析翻译完成，共 ${tranParsed.length} 行`);
+          result.lrc = alignLyrics(result.lrc, parseLrcData(tranParsed), "tran");
+        }
+        if (lrcData.romalrc) {
+          console.log("[parseLyric] 开始解析音译歌词");
+          // 预处理音译歌词
+          let romalrcText = lrcData.romalrc;
+          romalrcText = romalrcText.replace(/\\n/g, '\n');
+          romaParsed = parseCoreLrc(romalrcText);
+          console.log(`[parseLyric] 解析音译完成，共 ${romaParsed.length} 行`);
+          result.lrc = alignLyrics(result.lrc, parseLrcData(romaParsed), "roma");
+        }
+
+        // Generate AM format data for LRC
+        result.lrcAMData = parseAMData(lrcParsed, tranParsed, romaParsed);
+        console.log(`[parseLyric] AM格式数据生成完成，共 ${result.lrcAMData.length} 行`);
+      } catch (error) {
+        console.error("[parseLyric] LRC解析出错:", error);
+        // 出错时设置基本歌词
+        result.lrc = [
+          { time: 0, content: "LRC解析出错" },
+          { time: 999, content: "Error parsing LRC" }
+        ];
       }
-      if (lrcData.romalrc) {
-        romaParsed = parseCoreLrc(lrcData.romalrc);
-        result.lrc = alignLyrics(result.lrc, parseLrcData(romaParsed), "roma");
-      }
-
-      // Generate AM format data for LRC
-      result.lrcAMData = parseAMData(lrcParsed, tranParsed, romaParsed);
     }
 
     // Parse YRC lyrics or handle pre-parsed TTML lyrics
@@ -371,27 +398,52 @@ const parseLyric = (data: LyricData | null): ParsedLyricResult => {
 };
 
 /**
- * Parse normal LRC lyrics
- * @param {LyricLine[]} lrcData Array of LyricLine objects
- * @returns {ParsedLyricLine[]} Parsed lyric data
+ * Process parsed Lyric data into easier to use format
  */
 const parseLrcData = (lrcData: LyricLine[]): ParsedLyricLine[] => {
-  if (!lrcData) return [];
+  if (!lrcData || !lrcData.length) {
+    console.warn('[parseLrcData] 输入的歌词数据为空');
+    return [];
+  }
 
-  return lrcData
-    .map(line => {
-      const words = line.words;
-      const time = msToS(words[0].startTime);
-      const content = words[0].word.trim();
+  console.log(`[parseLrcData] 开始处理${lrcData.length}行歌词数据`);
+  
+  const result = lrcData.map((line, index) => {
+    // 确保line和line.words存在
+    if (!line || !line.words || !line.words.length) {
+      console.warn(`[parseLrcData] 第${index}行数据不完整`);
+      return null;
+    }
+    
+    // 获取行开始时间
+    let time = 0;
+    if (line.words && line.words.length > 0) {
+      time = line.words[0].startTime;
+    }
 
-      if (!content) return null;
+    // 将歌词单词连接为完整内容
+    let content = '';
+    if (line.words && line.words.length > 0) {
+      content = line.words.map((word) => word.word || '').join('');
+    }
+    
+    // 只有有内容的行才返回
+    if (!content || !content.trim()) {
+      return null;
+    }
 
-      return {
-        time,
-        content
-      };
-    })
-    .filter((line): line is ParsedLyricLine => line !== null);
+    if (index < 5 || index % 10 === 0) {
+      console.log(`[parseLrcData] 处理第${index}行: 时间=${time}ms, 内容="${content.substring(0, 15)}..."`);
+    }
+    
+    return {
+      time,
+      content,
+    };
+  }).filter((line): line is ParsedLyricLine => line !== null);
+
+  console.log(`[parseLrcData] 处理完成，输出${result.length}行有效歌词`);
+  return result;
 };
 
 /**
@@ -558,8 +610,20 @@ const parseAMData = (
     console.log(`[parseAMData] 没有音译歌词数据`);
   }
   
-  // 更宽松的时间匹配容忍度，从3秒增加到8秒
-  const TIME_TOLERANCE = 8000; // 8秒容忍度
+  // 更宽松的时间匹配容忍度，从8秒增加到15秒，主要是考虑到LAAPI歌词的时间戳可能与原歌词差距更大
+  const TIME_TOLERANCE = 15000; // 15秒容忍度
+  console.log(`[parseAMData] 使用${TIME_TOLERANCE/1000}秒的时间匹配容忍度`);
+
+  // 记录源数据的时间分布
+  if (tranMap.size > 0) {
+    const tranTimes = Array.from(tranMap.keys()).sort((a, b) => a - b);
+    console.log(`[parseAMData] 翻译歌词时间范围: ${msToTime(tranTimes[0])} 到 ${msToTime(tranTimes[tranTimes.length-1])}`);
+  }
+
+  if (romaMap.size > 0) {
+    const romaTimes = Array.from(romaMap.keys()).sort((a, b) => a - b);
+    console.log(`[parseAMData] 音译歌词时间范围: ${msToTime(romaTimes[0])} 到 ${msToTime(romaTimes[romaTimes.length-1])}`);
+  }
   
   const result = lrcData.map((line, index, lines) => {
     // 获取当前行的开始时间
