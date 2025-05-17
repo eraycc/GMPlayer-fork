@@ -832,7 +832,7 @@ watch(
 // 监听频谱更新
 watch(() => music.getSpectrumsData, throttle(200, (val) => {
   if (!music.getPlayState || !setting.dynamicFlowSpeed) return;
-  const variance = Math.max(Math.round(analyzeAudioIntensity(val) * setting.dynamicFlowSpeedScale * 7), 6)
+  const variance = Math.max(Math.round(analyzeAudioIntensity(val) * setting.dynamicFlowSpeedScale * 4), 6)
   dynamicFlowSpeed.value = variance
 }))
 

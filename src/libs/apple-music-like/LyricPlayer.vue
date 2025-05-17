@@ -61,7 +61,7 @@ const lyricStyles = computed(() => ({
   '--amll-lp-color': mainColor.value,
   '--amll-lyric-player-font-size': `${setting.lyricsFontSize * 11}px`,
   '--amll-lp-height': setting.lyricLineHeight,
-  '--amll-lp-word-spacing': '-0.03em',
+  '--amll-lp-word-spacing': '0em',
   'font-weight': setting.lyricFontWeight,
   'font-family': setting.lyricFont,
   'letter-spacing': setting.lyricLetterSpacing,
@@ -89,6 +89,10 @@ const mainColor = computed(() => {
 onMounted(() => {
   // 如果有歌词数据，预处理并缓存结果
   if (music.songLyric) {
+    lyricPlayerRef.value?.lyricPlayer?.value?.setCurrentTime(currentTime.value);
+    music.playState == true ? lyricPlayerRef.value?.lyricPlayer?.value?.resume() : lyricPlayerRef.value?.lyricPlayer?.value?.pause();
+    lyricPlayerRef.value?.lyricPlayer?.value?.calcLayout();
+    lyricPlayerRef.value?.lyricPlayer?.value?.update();
     console.log("[LyricPlayer] 组件挂载时预处理歌词数据");
     try {
       preprocessLyrics(music.songLyric, { 
