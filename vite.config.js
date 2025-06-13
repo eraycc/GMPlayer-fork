@@ -89,7 +89,7 @@ export default ({ mode }) =>
       port: 25536,
       open: true,
       http: true,
-      ssr: true,
+      ssr: false,
       proxy: {
         "/api": {
           target: loadEnv(mode, process.cwd()).VITE_MUSIC_API,
