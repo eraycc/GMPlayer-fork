@@ -2,13 +2,14 @@ import axios from "axios";
 
 switch (process.env.NODE_ENV) {
   case "production":
-    axios.defaults.baseURL = import.meta.env.VITE_MUSIC_API;
+    // 生产环境同样走 Vite 代理（由 Nginx / 其它服务器转发到真正的后端），避免跨域问题
+    axios.defaults.baseURL = "/api";
     break;
   case "development":
     axios.defaults.baseURL = "/api";
     break;
   default:
-    axios.defaults.baseURL = import.meta.env.VITE_MUSIC_API;
+    axios.defaults.baseURL = "/api";
     break;
 }
 
