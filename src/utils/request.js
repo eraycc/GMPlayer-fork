@@ -2,14 +2,14 @@ import axios from "axios";
 
 switch (process.env.NODE_ENV) {
   case "production":
-    // 生产环境同样走 Vite 代理（由 Nginx / 其它服务器转发到真正的后端），避免跨域问题
-    axios.defaults.baseURL = "/api";
+    // 生产环境也使用 '/api'，需要在部署服务器 (Nginx、Apache、Netlify 等) 上做反向代理到真实后端，规避 CORS
+    axios.defaults.baseURL = "/api/ncm";
     break;
   case "development":
-    axios.defaults.baseURL = "/api";
+    axios.defaults.baseURL = "/api/ncm";
     break;
   default:
-    axios.defaults.baseURL = "/api";
+    axios.defaults.baseURL = "/api/ncm";
     break;
 }
 
