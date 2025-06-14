@@ -9,11 +9,6 @@
       setting.appleStyle && !isMobile ? 'apple-style' : ''
     ]"
     :style="[
-      music.getPlaySongData && setting.backgroundImageShow === 'blur'
-        ? 'background-image: url(' +
-          music.getPlaySongData.album.picUrl.replace(/^http:/, 'https:') +
-          '?param=50y50)'
-        : '',
       `--cover-bg: ${songPicGradient}`,
       `--main-cover-color: rgb(${setting.immersivePlayer ? songPicColor : '255,255,255'})`,
     ]"
@@ -23,11 +18,12 @@
       <div :key="`bg--${songPicGradient}`" :class="['overlay', setting.backgroundImageShow]">
         <template v-if="setting.backgroundImageShow === 'blur'">
           <BlurBackgroundRender
+            v-if="music.getPlaySongData"
             :fps="music.getPlayState ? setting.fps || 30 : 0"
             :playing="actualPlayingProp"
             :album="music.getPlaySongData.album.picUrl.replace(/^http:/, 'https:')"
-            :blurAmount="setting.blurAmount || 30"
-            :contrast="setting.contrastAmount || 1.2"
+            :blurLevel="setting.blurAmount || 30"
+            :saturation="setting.contrastAmount || 1.2"
             :renderScale="setting.renderScale || 0.5"
             class="blur-webgl"
           />
@@ -1310,7 +1306,8 @@ watch(
     }
   }
 
-  &.bplayer-eplor {
+  &.bplayer-eplor,
+  &.bplayer-blur {
     .gray {
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
