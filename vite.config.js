@@ -89,7 +89,7 @@ export default ({ mode }) =>
       port: 25536,
       open: true,
       http: true,
-      ssr: false,
+      ssr: true,
       proxy: {
         "/api/ncm": {
           target: loadEnv(mode, process.cwd()).VITE_MUSIC_API,
