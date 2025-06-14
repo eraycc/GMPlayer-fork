@@ -101,6 +101,11 @@ export default ({ mode }) =>
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/unm/, ""),
         },
+        "/api/la": {
+          target: loadEnv(mode, process.cwd()).VITE_LYRIC_ATLAS_API_URL,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/la/, ""),
+        },
       },
     },
     envPrefix: ['VITE_', 'TAURI_PLATFORM', 'TAURI_ARCH', 'TAURI_FAMILY', 'TAURI_PLATFORM_VERSION', 'TAURI_PLATFORM_TYPE', 'TAURI_DEBUG'],
@@ -132,6 +137,11 @@ export default ({ mode }) =>
           target: loadEnv(mode, process.cwd()).VITE_UNM_API,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/unm/, ""),
+        },
+        "/api/la": {
+          target: "https://lyric-atlas-api.vercel.app",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/la/, ""),
         },
       },
     },
