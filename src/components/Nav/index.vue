@@ -75,9 +75,8 @@
           @click="showDropdown = !showDropdown"
         />
       </n-dropdown>
-      <!-- 关于本站 
+      <!-- 关于本站 -->
       <AboutSite ref="aboutSiteRef" />
-      -->
     </div>
   </nav>
 </template>
