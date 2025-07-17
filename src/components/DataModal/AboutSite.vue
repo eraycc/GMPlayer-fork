@@ -18,11 +18,13 @@
       <n-blockquote>
         <n-text class="power">
           Copyright&nbsp;©&nbsp;2020 - {{ new Date().getFullYear() }}
+          <!--
           <n-a
             :href="packageJson.home"
             target="_blank"
             v-html="packageJson.author"
           />
+          -->
         </n-text>
         <n-text class="point" v-html="'·'" />
         <n-a
@@ -33,6 +35,7 @@
           v-html="icp"
         />
       </n-blockquote>
+      <!--
       <n-button
         class="github"
         secondary
@@ -44,6 +47,7 @@
         </template>
         Github
       </n-button>
+      -->
     </div>
   </n-modal>
 </template>
